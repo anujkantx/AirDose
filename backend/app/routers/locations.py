@@ -1,7 +1,7 @@
 import json
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, status, Depends
-from app.database import (
+from app.services.location_service import (
     create_user_location,
     get_user_locations,
     delete_user_location,

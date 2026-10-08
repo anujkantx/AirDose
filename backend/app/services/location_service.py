@@ -1,5 +1,6 @@
 """Location Service for AirDose.
-Handles geofence detection using Haversine distance,
+Handles CRUD management of user saved locations,
+geofence detection using Haversine distance,
 environment resolution (HOME, OFFICE, COLLEGE, OUTDOOR, etc.),
 and boundary hysteresis / debouncing to prevent flapping on noisy GPS data.
 """
@@ -10,10 +11,12 @@ from app.core.constants import (
     DEFAULT_INDOOR_FACTOR,
     OUTDOOR_FACTOR,
     DEFAULT_PLACE_RADIUS_METERS,
+    MIN_PLACE_RADIUS_METERS,
+    MAX_PLACE_RADIUS_METERS,
     HYSTERESIS_BUFFER_METERS,
     HYSTERESIS_SAMPLE_THRESHOLD,
 )
-from app.database import get_user_locations, get_user_location_by_id
+from app.db.connection import get_db
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -33,7 +36,111 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 
 class LocationService:
-    """Service to evaluate user environments from GPS coordinates."""
+    """Service to manage saved places CRUD and evaluate user environments from GPS coordinates."""
+
+    # ------------------- CRUD Operations -------------------
+
+    @staticmethod
+    def create_user_location(
+        user_id: int,
+        location_type: str,
+        name: str,
+        latitude: float,
+        longitude: float,
+        address: str = "",
+        radius_meters: float = 50.0,
+        indoor_coefficient: Optional[float] = 0.5,
+        questionnaire_json: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Creates a new saved location for a user."""
+        coeff = indoor_coefficient if indoor_coefficient is not None else 0.5
+        raw_rad = float(radius_meters) if radius_meters is not None else DEFAULT_PLACE_RADIUS_METERS
+        rad = max(MIN_PLACE_RADIUS_METERS, min(MAX_PLACE_RADIUS_METERS, raw_rad))
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO user_locations (user_id, location_type, name, latitude, longitude, address, radius_meters, indoor_coefficient, questionnaire_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (user_id, location_type.strip().lower(), name.strip(), float(latitude), float(longitude), address.strip(), float(rad), float(coeff), questionnaire_json)
+            )
+            loc_id = cursor.lastrowid
+            cursor.execute("SELECT * FROM user_locations WHERE id = ?", (loc_id,))
+            return dict(cursor.fetchone())
+
+    @staticmethod
+    def get_user_locations(user_id: int) -> List[Dict[str, Any]]:
+        """Fetches all saved locations for a given user."""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM user_locations WHERE user_id = ? ORDER BY id DESC",
+                (user_id,)
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def get_user_location_by_id(location_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+        """Retrieves a single location by its ID and user ID."""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM user_locations WHERE id = ? AND user_id = ?",
+                (location_id, user_id)
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    @staticmethod
+    def update_user_location(
+        location_id: int,
+        user_id: int,
+        name: Optional[str] = None,
+        location_type: Optional[str] = None,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+        address: Optional[str] = None,
+        radius_meters: Optional[float] = None,
+        indoor_coefficient: Optional[float] = None,
+        questionnaire_json: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Updates an existing saved location."""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            existing = LocationService.get_user_location_by_id(location_id, user_id)
+            if not existing:
+                return None
+
+            new_name = name.strip() if name is not None else existing["name"]
+            new_type = location_type.strip().lower() if location_type is not None else existing["location_type"]
+            new_lat = float(latitude) if latitude is not None else existing["latitude"]
+            new_lon = float(longitude) if longitude is not None else existing["longitude"]
+            new_addr = address if address is not None else existing["address"]
+            raw_rad = float(radius_meters) if radius_meters is not None else existing["radius_meters"]
+            new_rad = max(MIN_PLACE_RADIUS_METERS, min(MAX_PLACE_RADIUS_METERS, raw_rad))
+            new_coeff = float(indoor_coefficient) if indoor_coefficient is not None else existing["indoor_coefficient"]
+            new_q = questionnaire_json if questionnaire_json is not None else existing.get("questionnaire_json")
+
+            cursor.execute(
+                """UPDATE user_locations
+                   SET name = ?, location_type = ?, latitude = ?, longitude = ?, address = ?, radius_meters = ?, indoor_coefficient = ?, questionnaire_json = ?, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ? AND user_id = ?""",
+                (new_name, new_type, new_lat, new_lon, new_addr, new_rad, new_coeff, new_q, location_id, user_id)
+            )
+            cursor.execute("SELECT * FROM user_locations WHERE id = ?", (location_id,))
+            return dict(cursor.fetchone())
+
+    @staticmethod
+    def delete_user_location(location_id: int, user_id: int) -> bool:
+        """Deletes a saved location for a user."""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM user_locations WHERE id = ? AND user_id = ?",
+                (location_id, user_id)
+            )
+            return cursor.rowcount > 0
+
+    # ------------------- Geofencing & Environment Resolution -------------------
 
     @staticmethod
     def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -44,7 +151,7 @@ class LocationService:
         user_id: int, lat: float, lon: float
     ) -> Optional[Dict[str, Any]]:
         """Finds closest saved place where distance <= radius_meters."""
-        places = get_user_locations(user_id)
+        places = LocationService.get_user_locations(user_id)
         best_match = None
         min_dist = float("inf")
 
@@ -74,7 +181,7 @@ class LocationService:
         Returns:
             (environment_info, new_outside_sample_count)
         """
-        places = get_user_locations(user_id)
+        places = LocationService.get_user_locations(user_id)
 
         # 1. Check if user was previously in a saved place and test with hysteresis
         if previous_place_id is not None:
@@ -149,3 +256,12 @@ class LocationService:
             "distance_m": None,
             "is_inside_saved_place": False,
         }, 0
+
+
+# Functional exports for backward compatibility and clean imports
+create_user_location = LocationService.create_user_location
+get_user_locations = LocationService.get_user_locations
+get_user_location_by_id = LocationService.get_user_location_by_id
+update_user_location = LocationService.update_user_location
+delete_user_location = LocationService.delete_user_location
+location_service = LocationService()

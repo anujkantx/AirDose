@@ -1,6 +1,6 @@
 """Air Quality Service for AirDose.
 Provides a clean, decoupled interface for PM2.5 observations,
-caching, and movement/time-based refresh logic (1 km / 30 minutes).
+caching, CRUD logging of telemetry samples, and movement/time-based refresh logic (1 km / 30 minutes).
 """
 
 import time
@@ -10,8 +10,27 @@ from app.core.constants import (
     POLLUTION_REFRESH_DISTANCE_M,
     POLLUTION_REFRESH_INTERVAL_SECONDS,
 )
+from app.db.connection import get_db
 from app.openaq_service import fetch_openaq_air_quality
-from app.database import insert_air_quality_sample
+
+
+# ------------------- CRUD for Air Quality Observations -------------------
+
+def insert_air_quality_sample(
+    latitude: float,
+    longitude: float,
+    pm25: float,
+    source: str = "OpenAQ",
+    confidence: str = "medium"
+) -> None:
+    """Stores an air quality observation sample in SQLite."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO air_quality_samples (latitude, longitude, pm25, source, confidence)
+               VALUES (?, ?, ?, ?, ?)""",
+            (latitude, longitude, pm25, source, confidence)
+        )
 
 
 class AirQualityService:
@@ -86,4 +105,3 @@ class AirQualityService:
 
 # Global singleton instance for service-wide pollution state
 air_quality_service = AirQualityService()
-

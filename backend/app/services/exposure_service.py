@@ -7,7 +7,7 @@ boundary debouncing, periodic checkpoints, and persistence to SQLite.
 
 import time
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from app.core.constants import (
     BASE_BREATHING_RATE_M3_S,
@@ -16,13 +16,83 @@ from app.core.constants import (
     OUTDOOR_FACTOR,
     EXPOSURE_CHECKPOINT_INTERVAL_SECONDS,
 )
+from app.db.connection import get_db
 from app.services.location_service import LocationService
 from app.services.air_quality_service import air_quality_service
 from app.services.daily_exposure_service import DailyExposureService
-from app.database import (
-    insert_exposure_segment,
-    insert_location_sample,
-)
+
+
+# ------------------- CRUD Operations for Segments & Telemetry -------------------
+
+def insert_exposure_segment(
+    user_id: int,
+    start_time: str,
+    end_time: str,
+    location_type: str,
+    location_id: Optional[int],
+    latitude: Optional[float],
+    longitude: Optional[float],
+    pm25: float,
+    pm25_timestamp: Optional[str],
+    pm25_source: Optional[str],
+    pm25_confidence: Optional[str],
+    infiltration_factor: float,
+    breathing_factor: float,
+    base_breathing_rate_m3_s: float,
+    inhalation_rate_ug_s: float,
+    exposure_ug: float,
+) -> Dict[str, Any]:
+    """Persists a closed exposure segment into SQLite."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO exposure_segments (
+                user_id, start_time, end_time, location_type, location_id,
+                latitude, longitude, pm25, pm25_timestamp, pm25_source, pm25_confidence,
+                infiltration_factor, breathing_factor, base_breathing_rate_m3_s,
+                inhalation_rate_ug_s, exposure_ug
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                user_id, start_time, end_time, location_type.upper(), location_id,
+                latitude, longitude, float(pm25), pm25_timestamp, pm25_source, pm25_confidence,
+                float(infiltration_factor), float(breathing_factor), float(base_breathing_rate_m3_s),
+                float(inhalation_rate_ug_s), float(exposure_ug)
+            )
+        )
+        seg_id = cursor.lastrowid
+        cursor.execute("SELECT * FROM exposure_segments WHERE id = ?", (seg_id,))
+        return dict(cursor.fetchone())
+
+
+def get_exposure_segments_for_day(user_id: int, date_str: str) -> List[Dict[str, Any]]:
+    """Retrieves all exposure segments for a specific user and date (YYYY-MM-DD)."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT * FROM exposure_segments
+               WHERE user_id = ? AND DATE(start_time) = ?
+               ORDER BY start_time ASC""",
+            (user_id, date_str)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def insert_location_sample(
+    user_id: int,
+    latitude: float,
+    longitude: float,
+    accuracy_meters: Optional[float] = None,
+    speed_mps: Optional[float] = None,
+    heading: Optional[float] = None,
+) -> None:
+    """Stores a raw location telemetry sample."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO location_samples (user_id, latitude, longitude, accuracy_meters, speed_mps, heading)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (user_id, latitude, longitude, accuracy_meters, speed_mps, heading)
+        )
 
 
 def calculate_inhalation_rate(
@@ -72,38 +142,38 @@ class ActiveSegment:
         self.infiltration_factor = infiltration_factor
         self.breathing_factor = breathing_factor
         self.base_breathing_rate_m3_s = base_breathing_rate_m3_s
-
-        self.inhalation_rate_ug_s = calculate_inhalation_rate(
-            pm25, infiltration_factor, breathing_factor, base_breathing_rate_m3_s
-        )
         self.accumulated_exposure_ug = 0.0
-        self.last_checkpoint_time = start_time
         self.outside_sample_count = 0
+        self.last_checkpoint_time = start_time
 
-    def update_accumulation(self, now: float) -> float:
-        """Accumulates exposure based on actual elapsed time since last update."""
-        if now <= self.last_updated_time:
-            return self.accumulated_exposure_ug
+    @property
+    def inhalation_rate_ug_s(self) -> float:
+        return calculate_inhalation_rate(
+            pm25=self.pm25,
+            infiltration_factor=self.infiltration_factor,
+            breathing_factor=self.breathing_factor,
+            base_breathing_rate_m3_s=self.base_breathing_rate_m3_s,
+        )
 
-        elapsed_seconds = now - self.last_updated_time
-        incremental_ug = self.inhalation_rate_ug_s * elapsed_seconds
-        self.accumulated_exposure_ug += incremental_ug
-        self.last_updated_time = now
+    def update_accumulation(self, current_time: float) -> float:
+        """Accurately calculates elapsed seconds from last_updated_time and integrates inhalation rate."""
+        delta_t = max(0.0, current_time - self.last_updated_time)
+        added_ug = self.inhalation_rate_ug_s * delta_t
+        self.accumulated_exposure_ug += added_ug
+        self.last_updated_time = current_time
         return self.accumulated_exposure_ug
 
-    def to_dict(self, now: Optional[float] = None) -> Dict[str, Any]:
-        """Serializes current active tracking state."""
-        current_time = now or time.time()
-        self.update_accumulation(current_time)
-
-        # Format ISO timestamps
-        start_dt = datetime.fromtimestamp(self.start_time, tz=timezone.utc).isoformat()
-        last_dt = datetime.fromtimestamp(self.last_updated_time, tz=timezone.utc).isoformat()
+    def to_dict(self, current_time: Optional[float] = None) -> Dict[str, Any]:
+        cur_t = current_time or time.time()
+        # Preview real-time total without modifying base update state
+        preview_dt = max(0.0, cur_t - self.last_updated_time)
+        preview_exp = self.accumulated_exposure_ug + (self.inhalation_rate_ug_s * preview_dt)
+        elapsed_s = max(0.0, cur_t - self.start_time)
 
         return {
             "user_id": self.user_id,
-            "segment_started_at": start_dt,
-            "last_updated_at": last_dt,
+            "start_time": datetime.fromtimestamp(self.start_time, tz=timezone.utc).isoformat(),
+            "elapsed_seconds": round(elapsed_s, 1),
             "location_type": self.location_type,
             "location_id": self.location_id,
             "location_name": self.location_name,
@@ -115,37 +185,33 @@ class ActiveSegment:
             "pm25_confidence": self.pm25_confidence,
             "infiltration_factor": round(self.infiltration_factor, 2),
             "breathing_factor": round(self.breathing_factor, 2),
-            "base_breathing_rate_m3_s": self.base_breathing_rate_m3_s,
             "inhalation_rate_ug_s": round(self.inhalation_rate_ug_s, 6),
-            "accumulated_exposure_ug": round(self.accumulated_exposure_ug, 4),
-            "tracking": True,
+            "accumulated_exposure_ug": round(preview_exp, 4),
         }
 
 
 class ExposureService:
-    """Main exposure tracking engine."""
+    """Singleton service that manages multi-user real-time exposure segments in memory and SQLite."""
 
     def __init__(self):
-        # In-memory dictionary of active segments keyed by user_id
+        # Maps user_id -> ActiveSegment
         self._active_segments: Dict[int, ActiveSegment] = {}
 
-    def get_active_segment(self, user_id: int) -> Optional[ActiveSegment]:
-        return self._active_segments.get(user_id)
-
-    def close_and_persist_segment(self, user_id: int, now: Optional[float] = None) -> Optional[Dict[str, Any]]:
-        """Closes the user's active segment, writes to exposure_segments,
-        and transactionally synchronizes daily_exposure total.
-        """
+    def close_and_persist_segment(
+        self, user_id: int, current_time: Optional[float] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Closes the current active segment, updates accumulated ug, and persists to SQLite."""
         segment = self._active_segments.pop(user_id, None)
         if not segment:
             return None
 
-        current_time = now or time.time()
+        if current_time is None:
+            current_time = time.time()
+
         segment.update_accumulation(current_time)
 
-        # Only persist segments that have meaningful duration (> 1 second)
-        duration_s = current_time - segment.start_time
-        if duration_s < 1.0 or segment.accumulated_exposure_ug <= 0.0:
+        # Do not persist zero-duration or negligible segments (< 1.0 second)
+        if (current_time - segment.start_time) < 1.0:
             return None
 
         start_iso = datetime.fromtimestamp(segment.start_time, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")

@@ -1,18 +1,83 @@
 """Daily Exposure Service for AirDose.
 Manages daily summaries (unique by user_id + date),
 ensures segment aggregation consistency, computes location contributions,
-and generates historical exposure analytics.
+and generates historical exposure analytics with direct database CRUD operations.
 """
 
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List
-from app.database import (
-    get_daily_exposure,
-    upsert_daily_exposure,
-    get_daily_exposure_history,
-    get_location_contributions,
-    get_exposure_segments_for_day,
-)
+from app.db.connection import get_db
+
+
+# ------------------- CRUD Operations for Daily Exposure & Aggregations -------------------
+
+def get_daily_exposure(user_id: int, date_str: str) -> Optional[Dict[str, Any]]:
+    """Retrieves the daily exposure summary row for a user on a given date."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM daily_exposure WHERE user_id = ? AND date = ?",
+            (user_id, date_str)
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
+def upsert_daily_exposure(user_id: int, date_str: str, total_pm25_ug: float) -> Dict[str, Any]:
+    """Inserts or updates the daily exposure total for a user on a given date."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO daily_exposure (user_id, date, total_pm25_ug)
+               VALUES (?, ?, ?)
+               ON CONFLICT(user_id, date) DO UPDATE SET
+                   total_pm25_ug = excluded.total_pm25_ug,
+                   updated_at = CURRENT_TIMESTAMP""",
+            (user_id, date_str, float(total_pm25_ug))
+        )
+        cursor.execute(
+            "SELECT * FROM daily_exposure WHERE user_id = ? AND date = ?",
+            (user_id, date_str)
+        )
+        return dict(cursor.fetchone())
+
+
+def get_daily_exposure_history(
+    user_id: int,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 30
+) -> List[Dict[str, Any]]:
+    """Fetches daily exposure history within an optional date range."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        query = "SELECT date, total_pm25_ug FROM daily_exposure WHERE user_id = ?"
+        params: List[Any] = [user_id]
+        if start_date:
+            query += " AND date >= ?"
+            params.append(start_date)
+        if end_date:
+            query += " AND date <= ?"
+            params.append(end_date)
+        query += " ORDER BY date ASC LIMIT ?"
+        params.append(limit)
+        cursor.execute(query, tuple(params))
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_location_contributions(user_id: int, date_str: str) -> Dict[str, float]:
+    """Calculates exposure contribution by location_type for a given day."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT location_type, SUM(exposure_ug) AS total_exposure
+               FROM exposure_segments
+               WHERE user_id = ? AND DATE(start_time) = ?
+               GROUP BY location_type""",
+            (user_id, date_str)
+        )
+        rows = cursor.fetchall()
+        return {row["location_type"]: round(float(row["total_exposure"]), 4) for row in rows}
 
 
 class DailyExposureService:
@@ -42,6 +107,7 @@ class DailyExposureService:
         """Recalculates daily total by aggregating all persisted exposure segments for that day.
         Guarantees that daily summary is strictly synchronized with segment records.
         """
+        from app.services.exposure_service import get_exposure_segments_for_day
         date_str = target_date or cls.get_today_date_str()
         segments = get_exposure_segments_for_day(user_id, date_str)
         total_ug = sum(seg.get("exposure_ug", 0.0) for seg in segments)

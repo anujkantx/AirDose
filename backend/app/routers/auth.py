@@ -2,7 +2,7 @@
 
 from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Query
-from app.database import get_user_by_email, create_user
+from app.services.user_service import get_user_by_email, create_user
 from app.schemas import SignUpRequest, SignInRequest, AuthResponse, UserOut
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])

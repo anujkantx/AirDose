@@ -5,7 +5,7 @@ preventing cross-user ID spoofing and enforcing user data isolation.
 
 from typing import Optional
 from fastapi import Header, Query, HTTPException, status
-from app.database import get_user_by_id, get_user_by_email
+from app.services.user_service import get_user_by_id, get_user_by_email
 
 
 def get_current_user_id(
