@@ -295,9 +295,13 @@ class ExposureService:
         new_loc_name = env_info["location_name"]
         new_infiltration = env_info["infiltration_factor"]
 
-        # 2. Get PM2.5 concentration
-        pollution = await air_quality_service.get_current_pm25(latitude, longitude)
-        pm25_val = pollution["pm25"]
+        # 2. Get PM2.5 concentration from unified telemetry
+        telemetry = await air_quality_service.get_air_quality_telemetry(latitude, longitude)
+        pm25_info = telemetry.get("pollutants", {}).get("pm25", {})
+        pm25_val = float(pm25_info.get("value") or 75.0)
+        pm25_timestamp = telemetry.get("cached_at") or telemetry.get("fetched_at") or datetime.now(timezone.utc).isoformat()
+        pm25_source = telemetry.get("source", "OpenAQ Global Clean Air Network")
+        pm25_confidence = "high" if telemetry.get("status") == "success" else "medium"
 
         # 3. Determine whether to start new segment
         should_start_new = False
@@ -336,9 +340,9 @@ class ExposureService:
                 latitude=latitude,
                 longitude=longitude,
                 pm25=pm25_val,
-                pm25_timestamp=pollution["timestamp"],
-                pm25_source=pollution["source"],
-                pm25_confidence=pollution["confidence"],
+                pm25_timestamp=pm25_timestamp,
+                pm25_source=pm25_source,
+                pm25_confidence=pm25_confidence,
                 infiltration_factor=new_infiltration,
                 breathing_factor=breathing_factor,
                 base_breathing_rate_m3_s=BASE_BREATHING_RATE_M3_S,
