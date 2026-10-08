@@ -13,9 +13,6 @@ from app.core.constants import (
 from app.db.connection import get_db
 from app.dependencies.openaq_api import fetch_openaq_air_quality
 
-
-# ------------------- CRUD for Air Quality Observations -------------------
-
 def insert_air_quality_sample(
     latitude: float,
     longitude: float,
@@ -34,15 +31,12 @@ def insert_air_quality_sample(
 
 
 class AirQualityService:
-    """Manages PM2.5 readings, smart caching, and refresh criteria."""
-
     def __init__(self):
         self._last_pm25_reading: Optional[Dict[str, Any]] = None
 
     async def get_air_quality_telemetry(
         self, lat: float, lon: float, force_refresh: bool = False
     ) -> Dict[str, Any]:
-        """Fetches complete air quality telemetry using the 1km / 30-minute spatio-temporal cache."""
         data = await fetch_openaq_air_quality(lat=lat, lon=lon, force_refresh=force_refresh)
         
         # Log sample if it's a fresh fetch
@@ -64,17 +58,14 @@ class AirQualityService:
     async def get_current_pm25(
         self, lat: float, lon: float, force_refresh: bool = False
     ) -> Dict[str, Any]:
-        """Returns the current PM2.5 concentration for the given coordinates.
-        Uses cached values unless 1km moved, 30m elapsed, or force_refresh is True.
-        """
         raw_data = await self.get_air_quality_telemetry(lat, lon, force_refresh=force_refresh)
         pm25_info = raw_data.get("pollutants", {}).get("pm25", {})
         pm25_value = pm25_info.get("value")
         if pm25_value is None or pm25_value < 0:
             pm25_value = 75.0  # Safe reasonable fallback
 
-        timestamp_iso = raw_data.get("fetched_at", datetime.now(timezone.utc).isoformat())
-        display_time = raw_data.get("fetched_at_display", datetime.now().strftime("%I:%M %p"))
+        timestamp_iso = raw_data.get("cached_at") or raw_data.get("fetched_at") or datetime.now(timezone.utc).isoformat()
+        display_time = raw_data.get("cached_at_display") or raw_data.get("fetched_at_display") or datetime.now().strftime("%I:%M %p")
         source_name = raw_data.get("source", "OpenAQ Global Clean Air Network")
 
         reading = {

@@ -52,6 +52,8 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
                     cached_data["cache_anchor_lon"] = entry["longitude"]
                     cached_data["cached_at"] = entry["iso"]
                     cached_data["cached_at_display"] = entry.get("display_time", "")
+                    cached_data["fetched_at"] = entry["iso"]
+                    cached_data["fetched_at_display"] = entry.get("display_time", "")
                     return cached_data
 
     # 2. Fresh OpenAQ fetch required
