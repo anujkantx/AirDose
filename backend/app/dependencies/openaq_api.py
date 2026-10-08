@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import httpx
 from dotenv import load_dotenv
 
-from app.core import calculate_pm25_aqi, haversine_distance
+from app.core import calculate_pm25_aqi, haversine_distance, select_best_station_for_location
 
 # Load environment variables
 load_dotenv()
@@ -59,7 +59,6 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
 
     # 2. Check API key configuration
     api_key = (os.getenv("OPENAQ_API_KEY") or OPENAQ_API_KEY or "").strip()
-
     current_iso = datetime.now(timezone.utc).isoformat()
     display_time = datetime.now().strftime("%I:%M %p")
 
@@ -160,36 +159,16 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
             if res.status_code == 200:
                 loc_data = res.json()
                 results = loc_data.get("results", [])
+                print(f"[OpenAQ Service] Locations API returned {len(results)} candidate stations")
 
-                # Extract distance directly from OpenAQ response (distance_meters or distance)
-                def get_station_dist_meters(loc: Dict[str, Any]) -> float:
-                    d = loc.get("distance_meters")
-                    if d is None:
-                        d = loc.get("distance")
-                    if d is not None:
-                        try:
-                            return float(d)
-                        except (ValueError, TypeError):
-                            pass
-                    return float("inf")
+                # Multi-factor station selection engine (Distance, Freshness, Sensors, Quality)
+                selection_result = select_best_station_for_location(lat, lon, results)
 
-                # Filter valid locations having sensors
-                valid_locations = [loc for loc in results if loc.get("sensors")]
-
-                # Prioritize stations having active PM2.5 sensor, then sort by native distance_meters
-                pm25_locations = [
-                    loc for loc in valid_locations
-                    if any(s.get("parameter", {}).get("name", "").lower() == "pm25" for s in loc.get("sensors", []))
-                ]
-                candidates = pm25_locations if pm25_locations else valid_locations
-
-                best_loc = min(candidates, key=get_station_dist_meters) if candidates else None
-
-                if best_loc:
+                if selection_result:
+                    best_loc = selection_result["station"]
                     station_lat = best_loc.get("coordinates", {}).get("latitude", lat)
                     station_lon = best_loc.get("coordinates", {}).get("longitude", lon)
-                    dist_m = get_station_dist_meters(best_loc)
-                    dist_km = round(dist_m / 1000.0, 2) if dist_m != float("inf") else 0.0
+                    dist_km = selection_result["distance_km"]
 
                     last_up = best_loc.get("last_measurement") or best_loc.get("datetimeLast")
                     if isinstance(last_up, dict):
@@ -205,6 +184,10 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
                         "latitude": station_lat,
                         "longitude": station_lon,
                         "last_updated": last_up_str,
+                        "score": selection_result["score"],
+                        "confidence": selection_result["confidence"],
+                        "score_breakdown": selection_result["score_breakdown"],
+                        "selection_reason": selection_result["selection_reason"],
                     }
 
                     # Deduplicate sensors for the same pollutant:
