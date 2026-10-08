@@ -1,26 +1,31 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   MapPin,
   Home,
   Building2,
   GraduationCap,
   Plus,
+  Pencil,
   Trash2,
-  ExternalLink,
+  ArrowUpRight,
   Copy,
   Check,
   Navigation,
-  Sparkles,
   X,
-  Compass,
+  ShieldCheck,
+  Sliders,
+  Sparkles,
 } from "lucide-react";
 import {
   UserLocation,
   UserLocationInput,
+  LocationQuestionnaire,
+  calculateClientInfiltrationFactor,
   fetchUserLocations,
   addUserLocation,
+  updateUserLocation,
   deleteUserLocation,
 } from "@/lib/api";
 
@@ -28,6 +33,14 @@ interface SavedLocationsTableProps {
   userId?: number;
   onLocationsCountChange?: (count: number) => void;
 }
+
+const DEFAULT_QUESTIONNAIRE: LocationQuestionnaire = {
+  enclosure: "fully_enclosed",
+  window_opening: "sometimes",
+  ventilation_type: "natural",
+  ac_usage: "no_ac",
+  air_purifier: "no_purifier",
+};
 
 export default function SavedLocationsTable({
   userId,
@@ -37,10 +50,12 @@ export default function SavedLocationsTable({
   const [loading, setLoading] = useState<boolean>(true);
   const [filterType, setFilterType] = useState<string>("all");
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [editingLocationId, setEditingLocationId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"basics" | "questions">("basics");
 
   // Form State
   const [formData, setFormData] = useState<UserLocationInput>({
@@ -49,7 +64,19 @@ export default function SavedLocationsTable({
     latitude: 28.6139,
     longitude: 77.2090,
     address: "",
+    radius_meters: 50,
+    indoor_coefficient: 0.5,
+    infiltration_factor: 0.5,
+    questionnaire: { ...DEFAULT_QUESTIONNAIRE },
   });
+
+  // Calculate dynamic infiltration factor live based on questions
+  const liveInfiltration = useMemo(() => {
+    if (formData.questionnaire) {
+      return calculateClientInfiltrationFactor(formData.questionnaire);
+    }
+    return formData.infiltration_factor ?? formData.indoor_coefficient ?? 0.5;
+  }, [formData.questionnaire, formData.infiltration_factor, formData.indoor_coefficient]);
 
   const loadLocations = async () => {
     try {
@@ -61,7 +88,6 @@ export default function SavedLocationsTable({
       }
     } catch (err) {
       console.error("Failed to fetch locations:", err);
-      // Fallback sample data if backend endpoint is unavailable during initial render
       const fallback: UserLocation[] = [
         {
           id: 1,
@@ -71,6 +97,9 @@ export default function SavedLocationsTable({
           latitude: 28.6139,
           longitude: 77.2090,
           address: "Central Delhi, India",
+          radius_meters: 50,
+          indoor_coefficient: 0.45,
+          infiltration_factor: 0.45,
           created_at: new Date().toISOString(),
         },
         {
@@ -81,6 +110,9 @@ export default function SavedLocationsTable({
           latitude: 28.4595,
           longitude: 77.0266,
           address: "Cyber Hub, Gurugram, India",
+          radius_meters: 50,
+          indoor_coefficient: 0.35,
+          infiltration_factor: 0.35,
           created_at: new Date().toISOString(),
         },
         {
@@ -91,6 +123,9 @@ export default function SavedLocationsTable({
           latitude: 28.5457,
           longitude: 77.1928,
           address: "IIT Delhi Campus, New Delhi",
+          radius_meters: 50,
+          indoor_coefficient: 0.55,
+          infiltration_factor: 0.55,
           created_at: new Date().toISOString(),
         },
       ];
@@ -107,7 +142,49 @@ export default function SavedLocationsTable({
     loadLocations();
   }, [userId]);
 
-  const handleAddLocation = async (e: React.FormEvent) => {
+  const handleOpenAddModal = () => {
+    setEditingLocationId(null);
+    setFormData({
+      location_type: "home",
+      name: "",
+      latitude: 28.6139,
+      longitude: 77.2090,
+      address: "",
+      radius_meters: 50,
+      indoor_coefficient: 0.5,
+      infiltration_factor: 0.5,
+      questionnaire: { ...DEFAULT_QUESTIONNAIRE },
+    });
+    setActiveTab("basics");
+    setErrorMsg("");
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (loc: UserLocation) => {
+    setEditingLocationId(loc.id);
+    const q = loc.questionnaire || {
+      ...DEFAULT_QUESTIONNAIRE,
+      enclosure: (loc.indoor_coefficient ?? 0.5) > 0.7 ? "mostly_open" : "fully_enclosed",
+    };
+    const coeff = loc.infiltration_factor ?? loc.indoor_coefficient ?? 0.5;
+
+    setFormData({
+      location_type: loc.location_type || "home",
+      name: loc.name,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      address: loc.address || "",
+      radius_meters: loc.radius_meters || 50,
+      indoor_coefficient: coeff,
+      infiltration_factor: coeff,
+      questionnaire: q,
+    });
+    setActiveTab("basics");
+    setErrorMsg("");
+    setIsModalOpen(true);
+  };
+
+  const handleSaveLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
       setErrorMsg("Please provide a name for this location.");
@@ -117,20 +194,31 @@ export default function SavedLocationsTable({
     try {
       setSubmitting(true);
       setErrorMsg("");
-      await addUserLocation({
+      const calculatedFactor = formData.questionnaire
+        ? calculateClientInfiltrationFactor(formData.questionnaire)
+        : 0.5;
+
+      const rawRadius = Number(formData.radius_meters) || 50;
+      const clampedRadius = Math.min(500, Math.max(50, rawRadius));
+
+      const payload: UserLocationInput = {
         ...formData,
         user_id: userId || 1,
         latitude: Number(formData.latitude),
         longitude: Number(formData.longitude),
-      });
+        radius_meters: clampedRadius,
+        indoor_coefficient: calculatedFactor,
+        infiltration_factor: calculatedFactor,
+      };
+
+      if (editingLocationId) {
+        await updateUserLocation(editingLocationId, payload);
+      } else {
+        await addUserLocation(payload);
+      }
+
       setIsModalOpen(false);
-      setFormData({
-        location_type: "home",
-        name: "",
-        latitude: 28.6139,
-        longitude: 77.2090,
-        address: "",
-      });
+      setEditingLocationId(null);
       await loadLocations();
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to save location point.");
@@ -168,8 +256,8 @@ export default function SavedLocationsTable({
             address: prev.address || "Detected via GPS",
           }));
         },
-        (error) => {
-          setErrorMsg("Could not fetch GPS position. Please enter manually.");
+        () => {
+          setErrorMsg("Could not fetch GPS position. Please enter coordinates manually.");
         }
       );
     } else {
@@ -177,13 +265,41 @@ export default function SavedLocationsTable({
     }
   };
 
-  const applyPreset = (type: string, name: string, lat: number, lng: number, addr: string) => {
+  const applyPreset = (
+    type: string,
+    name: string,
+    lat: number,
+    lng: number,
+    addr: string,
+    q: LocationQuestionnaire
+  ) => {
+    const factor = calculateClientInfiltrationFactor(q);
     setFormData({
       location_type: type,
       name,
       latitude: lat,
       longitude: lng,
       address: addr,
+      radius_meters: 50,
+      indoor_coefficient: factor,
+      infiltration_factor: factor,
+      questionnaire: q,
+    });
+  };
+
+  const updateQuestion = (key: keyof LocationQuestionnaire, value: string) => {
+    setFormData((prev) => {
+      const updatedQ: LocationQuestionnaire = {
+        ...(prev.questionnaire || DEFAULT_QUESTIONNAIRE),
+        [key]: value,
+      };
+      const factor = calculateClientInfiltrationFactor(updatedQ);
+      return {
+        ...prev,
+        indoor_coefficient: factor,
+        infiltration_factor: factor,
+        questionnaire: updatedQ,
+      };
     });
   };
 
@@ -193,117 +309,131 @@ export default function SavedLocationsTable({
         return {
           label: "Home",
           icon: Home,
-          color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+          color: "bg-emerald-50 text-emerald-600 border-emerald-100",
         };
       case "office":
         return {
           label: "Office",
           icon: Building2,
-          color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+          color: "bg-blue-50 text-[#0062ff] border-blue-100",
         };
       case "college":
         return {
           label: "College",
           icon: GraduationCap,
-          color: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+          color: "bg-purple-50 text-purple-600 border-purple-100",
         };
       default:
         return {
           label: "Other",
           icon: MapPin,
-          color: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+          color: "bg-slate-50 text-slate-600 border-slate-200",
         };
     }
   };
 
-  const filteredLocations =
-    filterType === "all"
-      ? locations
-      : locations.filter((loc) => loc.location_type.toLowerCase() === filterType);
+  const getInfiltrationBadge = (coeff: number) => {
+    const filteredPercent = Math.max(0, Math.min(100, Math.round((1 - coeff) * 100)));
+    if (filteredPercent >= 60) {
+      return {
+        filteredPercent,
+        color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        dotColor: "bg-emerald-500",
+        label: "High filtration",
+      };
+    } else if (filteredPercent >= 40) {
+      return {
+        filteredPercent,
+        color: "bg-amber-50 text-amber-700 border-amber-200",
+        dotColor: "bg-amber-500",
+        label: "Moderate filtration",
+      };
+    } else {
+      return {
+        filteredPercent,
+        color: "bg-rose-50 text-rose-700 border-rose-200",
+        dotColor: "bg-rose-500",
+        label: "Low filtration",
+      };
+    }
+  };
+
+  const filteredLocations = locations.filter((loc) => {
+    if (filterType === "all") return true;
+    return loc.location_type.toLowerCase() === filterType.toLowerCase();
+  });
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <Compass className="w-5 h-5 text-emerald-400" />
-            <h3 className="text-base font-bold text-white tracking-tight">
-              Saved Location Points
-            </h3>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-slate-700">
-              {locations.length} Saved
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Store latitude &amp; longitude coordinates for Home, Office, College, and custom places.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Category Filter Pills */}
-          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-            {["all", "home", "office", "college", "other"].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setFilterType(cat)}
-                className={`px-2.5 py-1 rounded-lg capitalize transition-all ${
-                  filterType === cat
-                    ? "bg-slate-800 text-emerald-400 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
+    <div className="bg-white rounded-[26px] p-6 sm:p-7 shadow-soft border border-slate-100">
+      {/* Category Filters and Add Place */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        {/* Category Filter Pills */}
+        <div className="flex items-center bg-[#0f1117] p-1 rounded-full text-xs font-semibold">
+          {["all", "home", "office", "college", "other"].map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilterType(cat)}
+              className={`px-3.5 py-1.5 rounded-full capitalize text-xs transition-all ${filterType === cat
+                  ? "bg-[#0062ff] text-white shadow-sm font-bold"
+                  : "text-slate-400 hover:text-slate-700 hover:bg-slate-200/50"
                 }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Add Location Button */}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl transition-all shadow-sm shadow-emerald-500/20"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Point
-          </button>
+            >
+              {cat}
+            </button>
+          ))}
         </div>
+
+        {/* Add Location Button */}
+        <button
+          onClick={handleOpenAddModal}
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#0062ff] hover:bg-blue-700 rounded-full transition-all shadow-sm"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add Place
+        </button>
       </div>
 
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
-              <th className="pb-3 font-semibold">Type</th>
-              <th className="pb-3 font-semibold">Location Name</th>
-              <th className="pb-3 font-semibold">Coordinates (Lat, Lng)</th>
-              <th className="pb-3 font-semibold">Address</th>
-              <th className="pb-3 font-semibold text-right">Actions</th>
+            <tr className="border-b border-slate-100 text-slate-400 uppercase tracking-wider text-[10px] font-semibold">
+              <th className="pb-3.5 pl-2">Type</th>
+              <th className="pb-3.5">Place Name</th>
+              <th className="pb-3.5">Radius</th>
+              <th className="pb-3.5">Infiltration Factor</th>
+              <th className="pb-3.5">Coordinates</th>
+              <th className="pb-3.5">Address</th>
+              <th className="pb-3.5 pr-2 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60">
+          <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-500">
+                <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
                   Loading saved coordinates...
                 </td>
               </tr>
             ) : filteredLocations.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-500">
-                  No saved locations found for this filter. Click "+ Add Point" to create one.
+                <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
+                  No saved places found for this filter. Click &quot;Add Place&quot; to create one.
                 </td>
               </tr>
             ) : (
               filteredLocations.map((loc) => {
                 const badge = getLocationBadge(loc.location_type);
                 const BadgeIcon = badge.icon;
+                const radius = loc.radius_meters || 50;
+                const coeff = loc.infiltration_factor ?? loc.indoor_coefficient ?? 0.5;
+                const infilBadge = getInfiltrationBadge(coeff);
+
                 return (
-                  <tr key={loc.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={loc.id} className="hover:bg-slate-50/80 transition-colors">
                     {/* Type Badge */}
-                    <td className="py-3">
+                    <td className="py-3.5 pl-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-medium ${badge.color}`}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-semibold ${badge.color}`}
                       >
                         <BadgeIcon className="w-3 h-3" />
                         {badge.label}
@@ -311,23 +441,43 @@ export default function SavedLocationsTable({
                     </td>
 
                     {/* Name */}
-                    <td className="py-3 font-semibold text-white">
+                    <td className="py-3.5 font-bold text-slate-900">
                       {loc.name}
                     </td>
 
+                    {/* Radius Geofence */}
+                    <td className="py-3.5 text-slate-600">
+                      <span className="bg-slate-100 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium">
+                        {radius}m
+                      </span>
+                    </td>
+
+                    {/* Indoor Infiltration Factor */}
+                    <td className="py-3.5">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-mono font-semibold ${infilBadge.color}`}
+                      >
+                        <span className={`w-1.5 h-1.5 rounded-full ${infilBadge.dotColor}`} />
+                        <span>{coeff.toFixed(2)}</span>
+                        <span className="font-sans font-medium text-[10px]">
+                          ({infilBadge.filteredPercent}% filtered)
+                        </span>
+                      </span>
+                    </td>
+
                     {/* Coordinates */}
-                    <td className="py-3 font-mono text-slate-300">
+                    <td className="py-3.5 text-slate-600 font-mono">
                       <div className="flex items-center gap-2">
                         <span>
                           {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
                         </span>
                         <button
                           onClick={() => handleCopyCoords(loc.id, loc.latitude, loc.longitude)}
-                          className="p-1 rounded text-slate-500 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
+                          className="p-1 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
                           title="Copy Coordinates"
                         >
                           {copiedId === loc.id ? (
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
                           ) : (
                             <Copy className="w-3.5 h-3.5" />
                           )}
@@ -336,29 +486,38 @@ export default function SavedLocationsTable({
                           href={`https://maps.google.com/?q=${loc.latitude},${loc.longitude}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1 rounded text-slate-500 hover:text-cyan-400 hover:bg-slate-800 transition-colors"
+                          className="p-1 rounded-full text-slate-400 hover:text-[#0062ff] hover:bg-slate-100 transition-colors"
                           title="Open in Google Maps"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" />
+                          <ArrowUpRight className="w-3.5 h-3.5" />
                         </a>
                       </div>
                     </td>
 
                     {/* Address */}
-                    <td className="py-3 text-slate-400 max-w-xs truncate">
+                    <td className="py-3.5 text-slate-500 max-w-xs truncate font-medium">
                       {loc.address || "N/A"}
                     </td>
 
-                    {/* Action */}
-                    <td className="py-3 text-right">
-                      <button
-                        onClick={() => handleDelete(loc.id)}
-                        disabled={deletingId === loc.id}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                        title="Delete Location"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    {/* Action buttons: Edit & Delete */}
+                    <td className="py-3.5 pr-2 text-right">
+                      <div className="inline-flex items-center gap-1 justify-end">
+                        <button
+                          onClick={() => handleOpenEditModal(loc)}
+                          className="p-1.5 rounded-full text-slate-400 hover:text-[#0062ff] hover:bg-blue-50 transition-colors"
+                          title="Edit / Update Place"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(loc.id)}
+                          disabled={deletingId === loc.id}
+                          className="p-1.5 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                          title="Delete Place"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -368,178 +527,479 @@ export default function SavedLocationsTable({
         </table>
       </div>
 
-      {/* Add Location Modal */}
+      {/* Modal: Add or Update Saved Place with 5 High-Signal Questions */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">Add Location Point</h3>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[92vh] flex flex-col shadow-2xl border border-slate-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 sm:p-6 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#0062ff] flex items-center justify-center">
+                  {editingLocationId ? <Pencil className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+                </div>
+                <div>
+                  <h4 className="text-base sm:text-lg font-bold text-slate-900">
+                    {editingLocationId ? "Update Geofenced Place" : "Add Geofenced Place"}
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium">
+                    Default 50m geofence radius • Simple form setup with optional infiltration questions
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {errorMsg && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs">
-                {errorMsg}
-              </div>
-            )}
-
-            {/* Presets Bar */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Quick Presets
-              </label>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyPreset("home", "Home Residence", 28.6139, 77.2090, "Central Delhi, India")
-                  }
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg border border-slate-700 flex items-center gap-1"
-                >
-                  <Home className="w-3 h-3" /> Home
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyPreset("office", "Corporate HQ", 28.4595, 77.0266, "Cyber Hub, Gurugram")
-                  }
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded-lg border border-slate-700 flex items-center gap-1"
-                >
-                  <Building2 className="w-3 h-3" /> Office
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    applyPreset("college", "University Campus", 28.5457, 77.1928, "IIT Delhi Campus")
-                  }
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-purple-400 rounded-lg border border-slate-700 flex items-center gap-1"
-                >
-                  <GraduationCap className="w-3 h-3" /> College
-                </button>
-              </div>
+            {/* Quick Place Presets in a Single Line at Top */}
+            <div className="bg-slate-50/90 border-b border-slate-100 px-5 sm:px-6 py-2.5 flex items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-none">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1.5 mr-1">
+                <Sparkles className="w-3.5 h-3.5 text-[#0062ff]" />
+                Quick Presets:
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPreset("home", "Home Residence", 28.6139, 77.2090, "Central Delhi, India", {
+                    enclosure: "fully_enclosed",
+                    window_opening: "almost_never",
+                    ventilation_type: "mixed",
+                    ac_usage: "recirculation",
+                    air_purifier: "most_of_time",
+                  })
+                }
+                className="shrink-0 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-full border border-emerald-200 flex items-center gap-1.5 text-xs font-semibold transition-all shadow-xs"
+              >
+                <Home className="w-3.5 h-3.5 text-emerald-600" /> Home (Sealed + Purifier)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPreset("office", "Corporate Office", 28.4595, 77.0266, "Cyber Hub, Gurugram", {
+                    enclosure: "fully_enclosed",
+                    window_opening: "almost_never",
+                    ventilation_type: "mechanical_hvac",
+                    ac_usage: "recirculation",
+                    air_purifier: "always",
+                  })
+                }
+                className="shrink-0 px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#0062ff] rounded-full border border-blue-200 flex items-center gap-1.5 text-xs font-semibold transition-all shadow-xs"
+              >
+                <Building2 className="w-3.5 h-3.5 text-[#0062ff]" /> Office (Central HVAC)
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  applyPreset("college", "University Campus", 28.5457, 77.1928, "IIT Delhi Campus", {
+                    enclosure: "partially_enclosed",
+                    window_opening: "frequently",
+                    ventilation_type: "natural",
+                    ac_usage: "no_ac",
+                    air_purifier: "no_purifier",
+                  })
+                }
+                className="shrink-0 px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-full border border-purple-200 flex items-center gap-1.5 text-xs font-semibold transition-all shadow-xs"
+              >
+                <GraduationCap className="w-3.5 h-3.5 text-purple-600" /> Campus (Open Classrooms)
+              </button>
             </div>
 
-            <form onSubmit={handleAddLocation} className="space-y-4">
-              {/* Type Select */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Location Category
-                </label>
-                <select
-                  value={formData.location_type}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, location_type: e.target.value }))
-                  }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="home">Home 🏠</option>
-                  <option value="office">Office 🏢</option>
-                  <option value="college">College / University 🎓</option>
-                  <option value="other">Other 📍</option>
-                </select>
-              </div>
-
-              {/* Name */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Location Name / Label *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. My Apartment, Main Office, Campus Library"
-                  value={formData.name}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  required
-                />
-              </div>
-
-              {/* Coordinates: Lat & Lng */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Latitude
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.latitude}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, latitude: parseFloat(e.target.value) }))
-                    }
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    required
-                  />
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+              {errorMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 text-xs">
+                  {errorMsg}
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Longitude
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.longitude}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, longitude: parseFloat(e.target.value) }))
-                    }
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    required
-                  />
-                </div>
-              </div>
+              )}
 
-              {/* GPS Auto Detect */}
-              <div>
+              {/* Navigation Tabs */}
+              <div className="flex border-b border-slate-100">
                 <button
                   type="button"
-                  onClick={handleDetectGPS}
-                  className="w-full inline-flex items-center justify-center gap-2 py-2 text-xs font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl transition-colors"
+                  onClick={() => setActiveTab("basics")}
+                  className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${activeTab === "basics"
+                      ? "border-[#0062ff] text-[#0062ff]"
+                      : "border-transparent text-slate-400 hover:text-slate-700"
+                    }`}
                 >
-                  <Navigation className="w-3.5 h-3.5" />
-                  Use My Current GPS Coordinates
+                  <MapPin className="w-3.5 h-3.5" />
+                  1. Location Details &amp; GPS
                 </button>
-              </div>
-
-              {/* Address */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Address / Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Sector 62, Noida, UP"
-                  value={formData.address}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                  onClick={() => setActiveTab("questions")}
+                  className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${activeTab === "questions"
+                      ? "border-[#0062ff] text-[#0062ff]"
+                      : "border-transparent text-slate-400 hover:text-slate-700"
+                    }`}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl shadow-md transition-all"
-                >
-                  {submitting ? "Saving..." : "Save Location Point"}
+                  <Sliders className="w-3.5 h-3.5" />
+                  2. Customize Infiltration ({Math.round((1 - liveInfiltration) * 100)}% Filtered)
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleSaveLocation} className="space-y-4">
+                {activeTab === "basics" ? (
+                  <div className="space-y-4">
+                    {/* Category */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Location Category
+                      </label>
+                      <select
+                        value={formData.location_type}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, location_type: e.target.value }))
+                        }
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0062ff] font-medium"
+                      >
+                        <option value="home">Home (HOME)</option>
+                        <option value="office">Office (OFFICE)</option>
+                        <option value="college">College (COLLEGE)</option>
+                        <option value="other">Other (OTHER)</option>
+                      </select>
+                    </div>
+
+                    {/* Name */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Place Name / Label *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. My Apartment, Main Office, Campus Library"
+                        value={formData.name}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0062ff] font-medium"
+                        required
+                      />
+                    </div>
+
+                    {/* Radius & Infiltration Readout */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Geofence Radius (meters)
+                        </label>
+                        <input
+                          type="number"
+                          step="10"
+                          min="50"
+                          max="500"
+                          placeholder="50"
+                          value={formData.radius_meters}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              radius_meters: parseFloat(e.target.value) || 50,
+                            }))
+                          }
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0062ff] font-mono"
+                          required
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">
+                          Min: 50m • Max: 500m (Default: 50m)
+                        </span>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-semibold text-slate-700">
+                            Infiltration Factor
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("questions")}
+                            className="text-[11px] font-semibold text-[#0062ff] hover:underline flex items-center gap-1"
+                          >
+                            <Sliders className="w-3 h-3" /> Edit Questions
+                          </button>
+                        </div>
+                        {(() => {
+                          const liveBadge = getInfiltrationBadge(liveInfiltration);
+                          return (
+                            <div className={`w-full border rounded-xl px-3.5 py-2 text-xs font-mono font-bold flex items-center justify-between ${liveBadge.color}`}>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`w-2 h-2 rounded-full ${liveBadge.dotColor}`} />
+                                <span>{liveInfiltration.toFixed(2)}</span>
+                              </div>
+                              <span className="text-[11px] font-medium font-sans">
+                                {liveBadge.filteredPercent}% filtered • {liveBadge.label}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">
+                          Click &quot;Edit Questions&quot; above to customize indoor physical parameters.
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Coordinates: Lat & Lng */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Latitude
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={formData.latitude}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, latitude: parseFloat(e.target.value) }))
+                          }
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0062ff] font-mono"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Longitude
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={formData.longitude}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, longitude: parseFloat(e.target.value) }))
+                          }
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0062ff] font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* GPS Auto Detect */}
+                    <div>
+                      <button
+                        type="button"
+                        onClick={handleDetectGPS}
+                        className="w-full inline-flex items-center justify-center gap-2 py-2.5 text-xs font-semibold text-[#0062ff] bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-100 transition-colors"
+                      >
+                        <Navigation className="w-3.5 h-3.5" />
+                        Auto Detect Current GPS
+                      </button>
+                    </div>
+
+                    {/* Address */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                        Address / Description (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Sector 62, Noida, UP"
+                        value={formData.address}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0062ff] font-medium"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3.5">
+                    {/* Infiltration Live Metric Banner */}
+                    <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50 p-3.5 rounded-2xl border border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-[#0062ff]" />
+                        <span className="text-xs font-semibold text-slate-700">Calculated Infiltration Factor:</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-extrabold text-[#0062ff] font-mono bg-white px-3 py-0.5 rounded-full border border-blue-200 shadow-xs">
+                          {liveInfiltration.toFixed(2)}
+                        </span>
+                        <span className="text-xs text-emerald-700 font-semibold bg-emerald-100/80 px-2.5 py-0.5 rounded-full">
+                          {Math.round((1 - liveInfiltration) * 100)}% Filtered
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Q1: Enclosure */}
+                    <div className="bg-slate-50/80 p-3.5 sm:p-4 rounded-2xl border border-slate-100">
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        1. How enclosed is this place?
+                      </label>
+                      <p className="text-[11px] text-slate-400 mb-2">
+                        Strongest baseline for outdoor pollutant penetration.
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { id: "fully_enclosed", label: "Fully enclosed" },
+                          { id: "partially_enclosed", label: "Partially enclosed" },
+                          { id: "mostly_open", label: "Mostly open" },
+                          { id: "fully_open", label: "Fully open" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => updateQuestion("enclosure", opt.id)}
+                            className={`px-3 py-2 rounded-xl text-xs font-medium text-center transition-all ${formData.questionnaire?.enclosure === opt.id
+                                ? "bg-[#0062ff] text-white shadow-xs"
+                                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                              }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Q2: Windows & Doors */}
+                    <div className="bg-slate-50/80 p-3.5 sm:p-4 rounded-2xl border border-slate-100">
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        2. How often are windows/doors open?
+                      </label>
+                      <p className="text-[11px] text-slate-400 mb-2">
+                        Directly affects outdoor air infiltration rate.
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { id: "almost_never", label: "Almost never" },
+                          { id: "sometimes", label: "Sometimes" },
+                          { id: "frequently", label: "Frequently" },
+                          { id: "usually_open", label: "Usually open" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => updateQuestion("window_opening", opt.id)}
+                            className={`px-3 py-2 rounded-xl text-xs font-medium text-center transition-all ${formData.questionnaire?.window_opening === opt.id
+                                ? "bg-[#0062ff] text-white shadow-xs"
+                                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                              }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Q3: Ventilation Type */}
+                    <div className="bg-slate-50/80 p-3.5 sm:p-4 rounded-2xl border border-slate-100">
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        3. What type of ventilation does this place mainly use?
+                      </label>
+                      <p className="text-[11px] text-slate-400 mb-2">
+                        Determines structural air exchange mode.
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                        {[
+                          { id: "mechanical_hvac", label: "Mechanical HVAC" },
+                          { id: "central_ac", label: "Central AC" },
+                          { id: "mixed", label: "Mixed mode" },
+                          { id: "exhaust_fan", label: "Exhaust fan" },
+                          { id: "natural", label: "Natural ventilation" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => updateQuestion("ventilation_type", opt.id)}
+                            className={`px-3 py-2 rounded-xl text-xs font-medium text-center transition-all ${formData.questionnaire?.ventilation_type === opt.id
+                                ? "bg-[#0062ff] text-white shadow-xs"
+                                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                              }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Q4: AC Usage */}
+                    <div className="bg-slate-50/80 p-3.5 sm:p-4 rounded-2xl border border-slate-100">
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        4. Do you use AC?
+                      </label>
+                      <p className="text-[11px] text-slate-400 mb-2">
+                        AC mode significantly alters fresh outdoor intake.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {[
+                          { id: "recirculation", label: "Yes, Recirculation" },
+                          { id: "no_ac", label: "No AC" },
+                          { id: "fresh_air_intake", label: "Yes, Fresh intake" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => updateQuestion("ac_usage", opt.id)}
+                            className={`px-3 py-2 rounded-xl text-xs font-medium text-center transition-all ${formData.questionnaire?.ac_usage === opt.id
+                                ? "bg-[#0062ff] text-white shadow-xs"
+                                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                              }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Q5: Air Purifier */}
+                    <div className="bg-slate-50/80 p-3.5 sm:p-4 rounded-2xl border border-slate-100">
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        5. Do you use an air purifier?
+                      </label>
+                      <p className="text-[11px] text-slate-400 mb-2">
+                        Removes indoor particulate PM2.5 concentrations.
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { id: "always", label: "Always (HEPA)" },
+                          { id: "most_of_time", label: "Most of time" },
+                          { id: "sometimes", label: "Sometimes" },
+                          { id: "no_purifier", label: "No purifier" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => updateQuestion("air_purifier", opt.id)}
+                            className={`px-3 py-2 rounded-xl text-xs font-medium text-center transition-all ${formData.questionnaire?.air_purifier === opt.id
+                                ? "bg-[#0062ff] text-white shadow-xs"
+                                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                              }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex justify-start">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("basics")}
+                        className="px-5 py-2.5 bg-blue-50 text-[#0062ff] hover:bg-blue-100 rounded-full text-xs font-bold transition-all"
+                      >
+                        &larr; Back to Location Details
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-6 py-2.5 text-xs font-semibold text-white bg-[#0062ff] hover:bg-blue-700 rounded-full shadow-sm transition-all"
+                  >
+                    {submitting
+                      ? "Saving..."
+                      : editingLocationId
+                        ? "Update Place"
+                        : "Save Place"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
