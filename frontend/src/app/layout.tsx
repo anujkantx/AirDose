@@ -3,8 +3,8 @@ import React from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AirDose | Personal Inhaled Pollution & Commute Decision Engine",
-  description: "Calculate estimated personal inhaled particulate burden (µg of PM2.5) and evaluate transit trade-offs for Bharat Builds / AWS Hackathon.",
+  title: "AirDose — Personal PM2.5 Inhalation Monitor & Telemetry",
+  description: "Calculate personal inhaled PM2.5 mass, geofenced micro-environments, and air quality telemetry.",
 };
 
 export default function RootLayout({
@@ -13,11 +13,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark h-full antialiased">
+    <html lang="en" className="h-full antialiased">
       <head>
-        <meta name="theme-color" content="#020617" />
+        <meta name="theme-color" content="#f0f3f8" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Chivo+Mono:ital,wght@0,300..900;1,300..900&family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
       </head>
-      <body className="min-h-full bg-slate-950 text-slate-100 flex flex-col selection:bg-emerald-500/30 selection:text-emerald-300">
+      <body className="min-h-full bg-[#f0f3f8] text-slate-900 font-sans flex flex-col selection:bg-blue-500/20 selection:text-blue-700 antialiased">
         {children}
       </body>
     </html>

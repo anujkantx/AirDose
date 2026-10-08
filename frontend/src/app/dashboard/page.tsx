@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import DashboardNavbar from "@/components/DashboardNavbar";
+import TodayExposureHero from "@/components/TodayExposureHero";
+import ExposureContributionCard from "@/components/ExposureContributionCard";
+import ExposureHistoryChart from "@/components/ExposureHistoryChart";
 import AirQualityHero from "@/components/AirQualityHero";
 import PollutantGrid from "@/components/PollutantGrid";
 import AirTrendChart from "@/components/AirTrendChart";
@@ -13,24 +16,28 @@ import {
   getStoredUser,
   clearSession,
   fetchAirQuality,
-  getStoredAirQuality,
+  fetchTodayExposure,
+  trackLocationTick,
+  stopExposureTracking,
   User,
   AirQualityData,
+  TodayExposureData,
 } from "@/lib/api";
+import { calculateHaversineDistance } from "@/lib/haversine";
 import {
-  Wind,
   RefreshCw,
-  Sparkles,
   Radio,
   MapPin,
-  ShieldCheck,
-  Zap,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [airData, setAirData] = useState<AirQualityData | null>(null);
+  const [exposureData, setExposureData] = useState<TodayExposureData | null>(null);
+  const [isTracking, setIsTracking] = useState<boolean>(true);
+  const [breathingFactor, setBreathingFactor] = useState<number>(1.0);
+  const [permissionDenied, setPermissionDenied] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
@@ -39,7 +46,84 @@ export default function DashboardPage() {
     lon: 77.2090,
   });
 
-  // Authenticate session & load real air quality data (with caching)
+  const lastCheckpointRef = useRef<{ lat: number; lon: number; time: number } | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+
+  // Load exposure data on mount without resetting on refresh
+  const loadExposureSummary = useCallback(async () => {
+    try {
+      const data = await fetchTodayExposure();
+      setExposureData(data);
+      if (data.tracking) {
+        setIsTracking(true);
+      }
+    } catch (err) {
+      console.warn("Could not load today exposure:", err);
+    }
+  }, []);
+
+  // Send a location tick to backend exposure engine (checkpointed)
+  const sendExposureTick = useCallback(
+    async (lat: number, lon: number, accuracy?: number, speed?: number, heading?: number, force: boolean = false) => {
+      const now = Date.now();
+      const last = lastCheckpointRef.current;
+
+      // Rate limit checkpoints: require >= 25m movement OR >= 60s elapsed unless force is true
+      if (!force && last) {
+        const dist = calculateHaversineDistance(lat, lon, last.lat, last.lon);
+        const elapsedSec = (now - last.time) / 1000;
+        if (dist < 25 && elapsedSec < 60) {
+          return; // Skip tick - live counter runs locally on frontend!
+        }
+      }
+
+      try {
+        lastCheckpointRef.current = { lat, lon, time: now };
+        const res = await trackLocationTick({
+          latitude: lat,
+          longitude: lon,
+          accuracy: accuracy ?? null,
+          speed: speed ?? null,
+          heading: heading ?? null,
+          breathing_factor: breathingFactor,
+          client_timestamp: now / 1000,
+        });
+
+        if (res && res.state) {
+          setExposureData((prev) => {
+            const currentObj = {
+              pm25: res.state.pm25,
+              environment: res.state.location_type,
+              location_id: res.state.location_id,
+              location_name: res.state.location_name,
+              infiltration_factor: res.state.infiltration_factor,
+              breathing_factor: res.state.breathing_factor,
+              base_breathing_rate_m3_s: res.state.base_breathing_rate_m3_s,
+              inhalation_rate_ug_s: res.state.inhalation_rate_ug_s,
+              last_pollution_updated_seconds_ago: 0,
+            };
+
+            const updatedContribs = { ...(prev?.contributions || {}) };
+            const envKey = res.state.location_type;
+            updatedContribs[envKey] = (updatedContribs[envKey] || 0) + res.state.accumulated_exposure_ug;
+
+            return {
+              date: prev?.date || new Date().toISOString().split("T")[0],
+              total_exposure_ug: res.total_exposure_ug,
+              current: currentObj,
+              contributions: updatedContribs,
+              tracking: true,
+            };
+          });
+        }
+      } catch (err) {
+        console.warn("Error sending exposure tick:", err);
+      }
+    },
+    [breathingFactor]
+  );
+
+  // Authenticate session & load initial data
   useEffect(() => {
     const currentUser = getStoredUser();
     if (!currentUser) {
@@ -48,32 +132,85 @@ export default function DashboardPage() {
     }
     setUser(currentUser);
 
-    // 1. Check if we already have fresh cached air quality data (e.g. from tab/page switch)
-    const cachedData = getStoredAirQuality();
-    if (cachedData) {
-      setAirData(cachedData);
-      setLoading(false);
-      return; // DO NOT make network call on tab or page switch
-    }
+    // 1. Load today's exposure summary and active tracking status
+    loadExposureSummary();
 
-    // 2. Cold load: detect coordinates and fetch once
+    // 2. Fetch air quality via backend spatio-temporal cache
+    loadAirQuality(userCoords.lat, userCoords.lon, false);
+
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
           setUserCoords(coords);
           loadAirQuality(coords.lat, coords.lon, false);
+          // Initial exposure tracking tick
+          sendExposureTick(
+            coords.lat,
+            coords.lon,
+            pos.coords.accuracy,
+            pos.coords.speed || undefined,
+            pos.coords.heading || undefined,
+            true
+          );
         },
         (err) => {
           console.warn("Geolocation fallback to default coords:", err);
+          if (err.code === err.PERMISSION_DENIED) {
+            setPermissionDenied(true);
+          }
           loadAirQuality(28.6139, 77.2090, false);
+          sendExposureTick(28.6139, 77.2090, 15, undefined, undefined, true);
         },
-        { timeout: 6000 }
+        { timeout: 8000 }
       );
     } else {
       loadAirQuality(28.6139, 77.2090, false);
+      sendExposureTick(28.6139, 77.2090, 15, undefined, undefined, true);
     }
-  }, [router]);
+  }, [router, loadExposureSummary, sendExposureTick]);
+
+  // High-accuracy location watcher for continuous exposure tracking
+  useEffect(() => {
+    if (!isTracking) {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      return;
+    }
+
+    if ("geolocation" in navigator) {
+      const id = navigator.geolocation.watchPosition(
+        (pos) => {
+          const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+          setUserCoords(coords);
+          sendExposureTick(
+            coords.lat,
+            coords.lon,
+            pos.coords.accuracy,
+            pos.coords.speed || undefined,
+            pos.coords.heading || undefined,
+            false
+          );
+        },
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED) {
+            setPermissionDenied(true);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      );
+      watchIdRef.current = id;
+    }
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [isTracking, sendExposureTick]);
 
   const loadAirQuality = async (lat?: number, lon?: number, forceRefresh: boolean = false) => {
     const targetLat = lat ?? userCoords.lat;
@@ -90,23 +227,52 @@ export default function DashboardPage() {
     }
   };
 
+  const handleToggleTracking = async () => {
+    if (isTracking) {
+      // Pause / Stop tracking
+      try {
+        await stopExposureTracking();
+        setIsTracking(false);
+        loadExposureSummary();
+      } catch (err) {
+        console.error("Failed to stop tracking:", err);
+      }
+    } else {
+      // Start tracking
+      setIsTracking(true);
+      sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true);
+    }
+  };
+
+  const handleBreathingFactorChange = (newFactor: number) => {
+    setBreathingFactor(newFactor);
+    if (isTracking) {
+      sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true);
+    }
+  };
+
   const handleLogout = () => {
+    if (isTracking) {
+      stopExposureTracking().catch(() => {});
+    }
     clearSession();
     router.push("/signin");
   };
 
   if (loading && !airData) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400">
-        <Wind className="w-10 h-10 text-emerald-400 animate-spin mb-4" />
-        <p className="text-sm font-medium">Connecting to OpenAQ Live Telemetry...</p>
-        <p className="text-xs text-slate-500 mt-1">Calibrating nearest particulate matter &amp; gas sensors</p>
+      <div className="min-h-screen bg-[#f0f3f8] flex flex-col items-center justify-center text-slate-500 font-sans">
+        <div className="w-10 h-10 rounded-2xl bg-[#0062ff] text-white flex items-center justify-center font-bold text-base mb-4 shadow-lg shadow-blue-500/20 animate-pulse">
+          AD
+        </div>
+        <p className="text-sm font-bold text-slate-800">Initializing Health &amp; Inhalation Engine...</p>
+        <p className="text-xs text-slate-400 mt-1">Connecting to OpenAQ particulate telemetry matrix</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex">
+    <div className="min-h-screen bg-[#f0f3f8] text-slate-900 flex font-sans">
       {/* 1. Sidebar */}
       <Sidebar
         user={user}
@@ -125,40 +291,64 @@ export default function DashboardPage() {
         />
 
         {/* 3. Main Dashboard Body */}
-        <main className="flex-1 p-6 sm:p-8 space-y-8 w-full">
-          {/* Dashboard Header Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-                OpenAQ Telemetry Live
+        <main className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 space-y-4">
+          {/* Dashboard Header Status Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs font-semibold text-[#0062ff] bg-white px-3 py-1.5 rounded-full border border-slate-100 shadow-soft flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Live Sensor Telemetry
               </span>
-              <span className="text-xs text-slate-400 font-mono hidden md:inline">
-                GPS: {userCoords.lat.toFixed(4)}, {userCoords.lon.toFixed(4)}
+              <span className="text-xs text-slate-400 font-medium hidden md:inline">
+                GPS: {userCoords.lat.toFixed(4)}°N, {userCoords.lon.toFixed(4)}°E
               </span>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => loadAirQuality(undefined, undefined, true)}
+                onClick={() => {
+                  loadAirQuality(undefined, undefined, true);
+                  loadExposureSummary();
+                }}
                 disabled={refreshing}
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-slate-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl transition-all shadow-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-full transition-all shadow-sm"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-emerald-400" : ""}`} />
-                <span>{refreshing ? "Syncing..." : "Refresh Air Data"}</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#0062ff]" : ""}`} />
+                <span>{refreshing ? "Syncing..." : "Refresh Matrix"}</span>
               </button>
             </div>
           </div>
 
+          {/* 1. Personal Exposure Tracking Hero (Matches Reference) */}
+          <TodayExposureHero
+            userName={user?.name}
+            userId={user?.id}
+            userCoords={userCoords}
+            exposureData={exposureData}
+            isTracking={isTracking}
+            onToggleTracking={handleToggleTracking}
+            selectedBreathingFactor={breathingFactor}
+            onBreathingFactorChange={handleBreathingFactorChange}
+            permissionDenied={permissionDenied}
+          />
 
-          {/* 1. Hero Air Quality & AQI Matrix */}
+          {/* 2. Exposure Insights: Micro-Environment Doughnut & Historical Inhalation Log */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <ExposureContributionCard
+              contributions={exposureData?.contributions || {}}
+              totalExposureUg={exposureData?.total_exposure_ug || 0}
+            />
+            <ExposureHistoryChart todayExposureUg={exposureData?.total_exposure_ug} />
+          </div>
+
+          {/* 3. Hero Air Quality & AQI Matrix */}
           <AirQualityHero data={airData} loading={refreshing && !airData} />
 
-          {/* 2. Real-time Pollutant Matrix (PM2.5, PM10, NO2, O3, CO, SO2) */}
+          {/* 4. Real-time Pollutant Matrix (PM2.5, PM10, NO2, O3, CO, SO2) */}
           <PollutantGrid data={airData} loading={refreshing && !airData} />
 
-          {/* 3. Temporal Trend & Monitoring Station Split */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 5. Temporal Trend & Monitoring Station Split */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
               <AirTrendChart
                 trendHistory={airData?.trend_history || []}
@@ -174,22 +364,22 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 4. Live GPS & Telemetry Card */}
+          {/* 6. Live GPS Telemetry Card */}
           <div>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-emerald-400" />
-                Live GPS &amp; Sensor Telemetry
-              </h3>
-              <span className="text-[10px] text-slate-500 font-mono">
-                Realtime HTML5 Telemetry
-              </span>
-            </div>
-            <CurrentLocationCard userId={user?.id} />
+            <CurrentLocationCard
+              userId={user?.id}
+              onLocationSaved={() => {
+                sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true);
+              }}
+            />
           </div>
         </main>
+
+        {/* Footer */}
+        <footer className="border-t border-slate-200/60 py-5 text-center text-xs text-slate-400 font-medium">
+          AirDose — Personal PM2.5 Inhalation Monitor • Mathematical Inhalation Model v1.0
+        </footer>
       </div>
     </div>
   );
 }
-

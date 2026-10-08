@@ -9,7 +9,7 @@ import {
   Mountain,
   Clock,
   RefreshCw,
-  ExternalLink,
+  ArrowUpRight,
   Plus,
   Radio,
   CheckCircle2,
@@ -144,21 +144,22 @@ export default function CurrentLocationCard({
       await addUserLocation({
         user_id: userId || 1,
         location_type: "other",
-        name: `Current Location (${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`,
+        name: `GPS Fix (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`,
         latitude: location.latitude,
         longitude: location.longitude,
-        address: `GPS Accuracy: ±${location.accuracy ? location.accuracy.toFixed(1) : 'N/A'}m`,
+        radius_meters: 100,
+        indoor_coefficient: 0.5,
+        address: `GPS Accuracy: ±${location.accuracy ? location.accuracy.toFixed(1) : "N/A"}m`,
       });
-      setSaveStatus("Saved!");
+      setSaveStatus("SAVED!");
       if (onLocationSaved) onLocationSaved();
       setTimeout(() => setSaveStatus(""), 2500);
     } catch (err: any) {
-      setSaveStatus("Save failed");
+      setSaveStatus("ERROR");
       setTimeout(() => setSaveStatus(""), 2500);
     }
   };
 
-  // Convert speed from m/s to km/h
   const speedKmh =
     location.speed !== null && !isNaN(location.speed)
       ? (location.speed * 3.6).toFixed(1)
@@ -172,62 +173,54 @@ export default function CurrentLocationCard({
   };
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-sm hover:border-slate-700/80 transition-all">
+    <div className="bg-white rounded-[26px] p-6 sm:p-7 shadow-soft border border-slate-100">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-2">
-            <Radio className="w-5 h-5 text-emerald-400 animate-pulse" />
-            <h3 className="text-base font-bold text-white tracking-tight">
-              Live Current Location Data
-            </h3>
-            <span
-              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
-                location.status === "active"
-                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                  : location.status === "locating"
-                  ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
-                  : "bg-slate-800 text-slate-400 border-slate-700"
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${isWatching ? "bg-emerald-400 animate-ping" : "bg-slate-400"}`} />
-              {isWatching ? "Live Watching" : location.status === "active" ? "GPS Locked" : "GPS Ready"}
-            </span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-blue-50 text-[#0062ff] flex items-center justify-center">
+              <Compass className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Live GPS Geolocation Telemetry
+              </h3>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
+                Real-time browser positioning &amp; spatial vector tracking
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Real-time telemetry breakdown: Latitude, Longitude, Accuracy, Speed, Altitude, Heading &amp; Timestamp.
-          </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* Watch toggle */}
+        <div className="flex items-center gap-2">
+          {/* Watch Toggle */}
           <button
             onClick={toggleWatch}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-full border transition-all flex items-center gap-1.5 ${
               isWatching
-                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-500/20"
-                : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                : "bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200"
             }`}
           >
-            <Radio className={`w-3.5 h-3.5 ${isWatching ? "animate-spin text-emerald-400" : ""}`} />
-            {isWatching ? "Stop Tracking" : "Live Watch"}
+            <Radio className={`w-3.5 h-3.5 ${isWatching ? "animate-spin text-emerald-600" : "text-slate-400"}`} />
+            {isWatching ? "Tracking Active" : "Live Watch"}
           </button>
 
-          {/* Refresh fix */}
+          {/* Refresh Fix */}
           <button
             onClick={fetchSingleFix}
             disabled={location.status === "locating"}
-            className="p-2 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all"
+            className="p-2 text-xs text-slate-500 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full transition-all"
             title="Refresh GPS Fix"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${location.status === "locating" ? "animate-spin text-emerald-400" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${location.status === "locating" ? "animate-spin text-[#0062ff]" : ""}`} />
           </button>
 
-          {/* Quick save button */}
+          {/* Save Place Button */}
           <button
             onClick={handleQuickSaveCurrent}
             disabled={!location.latitude}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-xl shadow-sm transition-all"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-[#0062ff] hover:bg-blue-700 rounded-full shadow-sm transition-all"
           >
             <Plus className="w-3.5 h-3.5" />
             {saveStatus || "Save Place"}
@@ -236,111 +229,109 @@ export default function CurrentLocationCard({
       </div>
 
       {location.errorMsg && (
-        <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 flex items-center gap-2">
+        <div className="mb-4 p-3 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-rose-600 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{location.errorMsg}</span>
         </div>
       )}
 
       {/* Grid of Geolocation Telemetry Fields */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {/* 1. Latitude */}
-        <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {/* Latitude */}
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Latitude</span>
-            <Navigation className="w-4 h-4 text-emerald-400" />
+            <Navigation className="w-3.5 h-3.5 text-emerald-500" />
           </div>
-          <div className="text-xl font-bold font-mono text-white tracking-tight">
+          <div className="text-lg font-bold font-mono text-slate-900">
             {location.latitude !== null ? location.latitude.toFixed(6) : "N/A"}
           </div>
-          <span className="text-[10px] text-slate-500 mt-1">Decimal Degrees (°N)</span>
+          <span className="text-[11px] text-slate-400 mt-1 font-medium">Decimal Degrees (°N)</span>
         </div>
 
-        {/* 2. Longitude */}
-        <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        {/* Longitude */}
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Longitude</span>
-            <MapPin className="w-4 h-4 text-cyan-400" />
+            <MapPin className="w-3.5 h-3.5 text-sky-500" />
           </div>
-          <div className="text-xl font-bold font-mono text-white tracking-tight">
+          <div className="text-lg font-bold font-mono text-slate-900">
             {location.longitude !== null ? location.longitude.toFixed(6) : "N/A"}
           </div>
-          <span className="text-[10px] text-slate-500 mt-1">Decimal Degrees (°E)</span>
+          <span className="text-[11px] text-slate-400 mt-1 font-medium">Decimal Degrees (°E)</span>
         </div>
 
-        {/* 3. Accuracy */}
-        <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        {/* Accuracy */}
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Accuracy</span>
-            <Target className="w-4 h-4 text-purple-400" />
+            <Target className="w-3.5 h-3.5 text-purple-500" />
           </div>
-          <div className="text-xl font-bold text-white tracking-tight">
+          <div className="text-lg font-bold font-mono text-slate-900">
             ±{location.accuracy !== null ? location.accuracy.toFixed(1) : "N/A"} <span className="text-xs text-slate-400 font-normal">m</span>
           </div>
-          <span className="text-[10px] text-emerald-400 font-medium mt-1">
+          <span className="text-[11px] text-emerald-600 font-medium mt-1">
             {location.accuracy && location.accuracy < 20 ? "High Precision" : "Standard Precision"}
           </span>
         </div>
 
-        {/* 4. Speed */}
-        <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        {/* Speed */}
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Speed</span>
-            <Gauge className="w-4 h-4 text-amber-400" />
+            <Gauge className="w-3.5 h-3.5 text-amber-500" />
           </div>
-          <div className="text-xl font-bold text-white tracking-tight">
+          <div className="text-lg font-bold font-mono text-slate-900">
             {speedKmh} <span className="text-xs text-slate-400 font-normal">km/h</span>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1">
+          <span className="text-[11px] text-slate-400 mt-1 font-medium">
             {location.speed !== null ? `${location.speed.toFixed(1)} m/s` : "Stationary"}
           </span>
         </div>
 
-        {/* 5. Altitude */}
-        <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        {/* Altitude */}
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Altitude</span>
-            <Mountain className="w-4 h-4 text-emerald-400" />
+            <Mountain className="w-3.5 h-3.5 text-emerald-500" />
           </div>
-          <div className="text-xl font-bold text-white tracking-tight">
+          <div className="text-lg font-bold font-mono text-slate-900">
             {location.altitude !== null ? `${location.altitude.toFixed(1)} m` : "N/A"}
           </div>
-          <span className="text-[10px] text-slate-500 mt-1">
-            {location.altitudeAccuracy !== null ? `±${location.altitudeAccuracy.toFixed(1)}m vertical` : "Above sea level"}
-          </span>
+          <span className="text-[11px] text-slate-400 mt-1 font-medium">Above sea level</span>
         </div>
 
-        {/* 6. Heading */}
-        <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        {/* Heading */}
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Heading</span>
-            <Compass className="w-4 h-4 text-indigo-400" />
+            <Compass className="w-3.5 h-3.5 text-sky-500" />
           </div>
-          <div className="text-xl font-bold text-white tracking-tight">
+          <div className="text-lg font-bold font-mono text-slate-900">
             {getHeadingCardinal(location.heading)}
           </div>
-          <span className="text-[10px] text-slate-500 mt-1">Direction of travel</span>
+          <span className="text-[11px] text-slate-400 mt-1 font-medium">Vector direction</span>
         </div>
 
-        {/* 7. Timestamp */}
-        <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
+        {/* Timestamp */}
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider">Last Fix</span>
-            <Clock className="w-4 h-4 text-slate-400" />
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
           </div>
-          <div className="text-lg font-semibold text-white tracking-tight font-mono">
+          <div className="text-base font-bold font-mono text-slate-900">
             {location.timestamp || "Just now"}
           </div>
-          <span className="text-[10px] text-emerald-400 font-medium mt-1 flex items-center gap-1">
+          <span className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1 font-medium">
             <CheckCircle2 className="w-3 h-3" /> Realtime Sync
           </span>
         </div>
 
-        {/* 8. Google Maps Link Card */}
-        <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider">Map Navigation</span>
-            <ExternalLink className="w-4 h-4 text-cyan-400" />
+        {/* Google Maps Anchor */}
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">Map Coordinates</span>
+            <ArrowUpRight className="w-3.5 h-3.5 text-[#0062ff]" />
           </div>
           <a
             href={
@@ -350,9 +341,9 @@ export default function CurrentLocationCard({
             }
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 rounded-lg text-xs font-semibold transition-colors mt-auto"
+            className="inline-flex items-center justify-center gap-1.5 py-2 px-3 bg-white hover:bg-slate-100 text-[#0062ff] border border-slate-200 rounded-xl text-xs font-semibold transition-colors mt-auto shadow-sm"
           >
-            Open Google Maps
+            Open in Maps
           </a>
         </div>
       </div>
