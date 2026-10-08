@@ -176,8 +176,6 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
         "aqi": aqi_score,
         "category": category_info["category"],
         "level": category_info["level"],
-        "color": category_info["color"],
-        "badgeClass": category_info["badgeClass"],
         "description": category_info["description"],
         "recommendation": category_info["recommendation"],
         "mask_needed": category_info["mask_needed"],

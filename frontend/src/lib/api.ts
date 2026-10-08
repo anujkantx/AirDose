@@ -344,8 +344,8 @@ export interface AirQualityData {
   aqi: number;
   category: string;
   level: string;
-  color: string;
-  badgeClass: string;
+  color?: string;
+  badgeClass?: string;
   description: string;
   recommendation: string;
   mask_needed: boolean;
