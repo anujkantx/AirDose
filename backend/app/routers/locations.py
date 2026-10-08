@@ -1,3 +1,9 @@
+"""User Saved Places & Geofences API Router.
+
+HTTP Presentation endpoints for managing user saved micro-environments
+(HOME, OFFICE, COLLEGE, OTHER) and calculating place infiltration factors.
+"""
+
 import json
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, status, Depends
@@ -8,9 +14,15 @@ from app.services.location_service import (
     update_user_location,
     get_user_location_by_id,
 )
-from app.schemas import UserLocationCreate, UserLocationUpdate, UserLocationOut, LocationQuestionnaire
+from app.schemas import UserLocationCreate, UserLocationUpdate, UserLocationOut
 from app.dependencies import get_current_user_id
-from app.core import calculate_infiltration_factor
+from app.core.infiltration import calculate_infiltration_factor
+from app.core.constants import (
+    DEFAULT_PLACE_RADIUS_METERS,
+    MIN_PLACE_RADIUS_METERS,
+    MAX_PLACE_RADIUS_METERS,
+    DEFAULT_INDOOR_FACTOR,
+)
 
 router = APIRouter(prefix="/api/locations", tags=["Saved Locations"])
 
@@ -26,7 +38,7 @@ def _format_location_out(loc: Dict[str, Any]) -> UserLocationOut:
 
     coeff = loc.get("indoor_coefficient")
     if coeff is None:
-        coeff = 0.5
+        coeff = DEFAULT_INDOOR_FACTOR
 
     return UserLocationOut(
         id=loc["id"],
@@ -36,7 +48,7 @@ def _format_location_out(loc: Dict[str, Any]) -> UserLocationOut:
         latitude=loc["latitude"],
         longitude=loc["longitude"],
         address=loc.get("address", ""),
-        radius_meters=loc.get("radius_meters") or 50.0,
+        radius_meters=loc.get("radius_meters") or DEFAULT_PLACE_RADIUS_METERS,
         indoor_coefficient=coeff,
         infiltration_factor=coeff,
         questionnaire=q_dict,
@@ -47,6 +59,7 @@ def _format_location_out(loc: Dict[str, Any]) -> UserLocationOut:
 
 @router.get("", response_model=List[UserLocationOut])
 def get_locations(user_id: int = Depends(get_current_user_id)):
+    """Retrieves all saved places for the authenticated user."""
     locations = get_user_locations(user_id)
     return [_format_location_out(loc) for loc in locations]
 
@@ -56,6 +69,7 @@ def add_location(
     payload: UserLocationCreate,
     user_id: int = Depends(get_current_user_id),
 ):
+    """Creates a new saved geofenced place and computes infiltration factor."""
     if not payload.name or not payload.location_type:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -67,7 +81,7 @@ def add_location(
     if loc_type not in valid_types:
         loc_type = "other"
 
-    radius = max(50.0, min(500.0, float(payload.radius_meters or 50.0)))
+    radius = max(MIN_PLACE_RADIUS_METERS, min(MAX_PLACE_RADIUS_METERS, float(payload.radius_meters or DEFAULT_PLACE_RADIUS_METERS)))
 
     q_json = None
     if payload.questionnaire:
@@ -79,7 +93,7 @@ def add_location(
     elif payload.indoor_coefficient is not None:
         indoor_coeff = round(max(0.10, min(1.00, payload.indoor_coefficient)), 2)
     else:
-        indoor_coeff = 0.50
+        indoor_coeff = DEFAULT_INDOOR_FACTOR
 
     try:
         new_loc = create_user_location(
@@ -143,7 +157,7 @@ def remove_location(
     location_id: int,
     user_id: int = Depends(get_current_user_id),
 ):
-    """Deletes a saved location point record."""
+    """Deletes a saved location record."""
     success = delete_user_location(location_id, user_id)
     if not success:
         raise HTTPException(
@@ -151,4 +165,3 @@ def remove_location(
             detail="Location point not found or unauthorized.",
         )
     return {"success": True, "message": "Location deleted successfully"}
-

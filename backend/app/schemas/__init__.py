@@ -1,4 +1,4 @@
-"""AirDose Pydantic data validation schemas."""
+"""Schemas package exports."""
 
 from app.schemas.auth import (
     SignUpRequest,
@@ -18,6 +18,15 @@ from app.schemas.exposure import (
     TodayExposureResponse,
     HistoryDataPoint,
     ExposureHistoryResponse,
+    TripSimulationRequest,
+    TripSimulationResponse,
+    TransitModeSimulation,
+)
+from app.schemas.air_quality import (
+    PollutantDetail,
+    StationInfo,
+    DataQualityInfo,
+    AirQualityResponse,
 )
 
 __all__ = [
@@ -34,4 +43,11 @@ __all__ = [
     "TodayExposureResponse",
     "HistoryDataPoint",
     "ExposureHistoryResponse",
+    "TripSimulationRequest",
+    "TripSimulationResponse",
+    "TransitModeSimulation",
+    "PollutantDetail",
+    "StationInfo",
+    "DataQualityInfo",
+    "AirQualityResponse",
 ]

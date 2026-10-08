@@ -11,6 +11,7 @@ import AirQualityHero from "@/components/AirQualityHero";
 import PollutantGrid from "@/components/PollutantGrid";
 import StationInfoCard from "@/components/StationInfoCard";
 import CurrentLocationCard from "@/components/CurrentLocationCard";
+import CleanAirAdvisoryCard from "@/components/CleanAirAdvisoryCard";
 import {
   getStoredUser,
   clearSession,
@@ -331,13 +332,14 @@ export default function DashboardPage() {
             permissionDenied={permissionDenied}
           />
 
-          {/* 2. Exposure Insights: Micro-Environment Doughnut & Historical Inhalation Log */}
+          {/* 2. Exposure Insights: Micro-Environment Breakdown, Historical Inhalation Log & Health Advisory */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <ExposureContributionCard
               contributions={exposureData?.contributions || {}}
               totalExposureUg={exposureData?.total_exposure_ug || 0}
             />
             <ExposureHistoryChart todayExposureUg={exposureData?.total_exposure_ug} />
+            <CleanAirAdvisoryCard airData={airData} exposureData={exposureData} />
           </div>
 
           {/* 3. Hero Air Quality & AQI Matrix */}

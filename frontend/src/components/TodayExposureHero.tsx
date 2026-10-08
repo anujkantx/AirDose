@@ -15,6 +15,7 @@ import {
   Play,
   Square,
   ShieldCheck,
+  ShieldAlert,
   Info,
   X,
   Zap,
@@ -22,9 +23,15 @@ import {
   Wind,
   Layers,
   CheckCircle2,
+  Cigarette,
+  Sparkles,
+  HeartPulse,
+  Flame,
+  Footprints,
 } from "lucide-react";
 import { TodayExposureData, UserLocation, fetchUserLocations } from "@/lib/api";
 import { calculateHaversineDistance, formatDistance } from "@/lib/haversine";
+import CommuteSimulatorModal from "@/components/CommuteSimulatorModal";
 
 interface TodayExposureHeroProps {
   userName?: string;
@@ -49,13 +56,14 @@ export default function TodayExposureHero({
   onBreathingFactorChange,
   permissionDenied,
 }: TodayExposureHeroProps) {
-  // Live ticker for smooth real-time accumulation on client
+  // Live ticker for smooth real-time sub-microgram accumulation
   const [liveDisplayExposure, setLiveDisplayExposure] = useState<number>(
     exposureData?.total_exposure_ug || 0.0
   );
   const [locations, setLocations] = useState<UserLocation[]>([]);
   const [lastUpdateSecondsAgo, setLastUpdateSecondsAgo] = useState<number>(0);
   const [isFormulaModalOpen, setIsFormulaModalOpen] = useState<boolean>(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
 
   const baseTotal = exposureData?.total_exposure_ug || 0.0;
   const currentRate = exposureData?.current?.inhalation_rate_ug_s || 0.0;
@@ -74,7 +82,7 @@ export default function TodayExposureHero({
     return () => clearInterval(interval);
   }, [isTracking, currentRate]);
 
-  // Load Saved Locations for proximity
+  // Load Saved Locations for proximity radar
   useEffect(() => {
     fetchUserLocations(userId)
       .then((data) => {
@@ -111,8 +119,14 @@ export default function TodayExposureHero({
   const placeName = current?.location_name || (environment === "OUTDOOR" ? "Outdoor" : environment);
   const infiltrationFactor = current?.infiltration_factor ?? 1.0;
   const pm25Value = current?.pm25 ?? 75.0;
-  const basalVentilation = 0.0001; // 0.0001 m3/s = 6 L/min
+  const basalVentilation = 0.0001;
   const calculatedLiveRate = pm25Value * infiltrationFactor * selectedBreathingFactor * basalVentilation;
+
+  // Medically calibrated health equivalence metrics
+  const liveCigarettes = Number((liveDisplayExposure / 20.0).toFixed(2));
+  const whoDailyLimitUg = 25.0;
+  const whoPercentage = Math.round((liveDisplayExposure / whoDailyLimitUg) * 100);
+  const shieldSavedUg = exposureData?.clean_air_shield_saved_ug || 0.0;
 
   // Contributions for progress bars
   const contribs = exposureData?.contributions || {};
@@ -127,8 +141,7 @@ export default function TodayExposureHero({
 
   // Circular gauge calculations
   const circumference = 2 * Math.PI * 40;
-  const progressRatio = Math.min(1, Math.max(0.15, (liveDisplayExposure % 100) / 100));
-  const strokeDashoffset = circumference - progressRatio * circumference;
+  const whoGaugeOffset = Math.max(0, circumference - Math.min(1.0, whoPercentage / 100) * circumference);
 
   // Real-time distances to places
   const currentLat = userCoords?.lat ?? 28.6139;
@@ -168,12 +181,13 @@ export default function TodayExposureHero({
     }
   };
 
-  const getActivityName = (factor: number) => {
-    if (factor <= 1.0) return "Resting";
-    if (factor <= 1.5) return "Walking";
-    if (factor <= 2.2) return "Exercise";
-    return "Vigorous";
-  };
+  const activityModes = [
+    { label: "Sleep", factor: 0.8, icon: "🛌" },
+    { label: "Desk", factor: 1.0, icon: "💻" },
+    { label: "Walk", factor: 1.8, icon: "🚶" },
+    { label: "Run", factor: 3.5, icon: "🏃" },
+    { label: "Workout", factor: 5.0, icon: "⚡" },
+  ];
 
   const timeAgoText =
     lastUpdateSecondsAgo < 5
@@ -184,62 +198,110 @@ export default function TodayExposureHero({
 
   return (
     <div className="space-y-4">
-      {/* Live Status Pill & Tracking Toggle Controls */}
-      <div className="flex items-center justify-end gap-2 pt-1 pb-1">
-        <div className="flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full border border-slate-200/80 shadow-sm text-xs font-semibold text-slate-700">
-          <span className={`w-2 h-2 rounded-full ${isTracking ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
-          <span>{isTracking ? "Tracking Active" : "Tracking Paused"}</span>
+      {/* Top Controls Header: Live Telemetry Status, Exertion Selector & Commute Simulator CTA */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1 pb-1">
+        {/* Left: Quick Activity Exertion Selector */}
+        <div className="flex items-center gap-1.5 bg-white p-1 rounded-full border border-slate-200/80 shadow-soft overflow-x-auto max-w-full">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-2 pr-1 hidden sm:inline">
+            Exertion:
+          </span>
+          {activityModes.map((act) => (
+            <button
+              key={act.factor}
+              onClick={() => onBreathingFactorChange(act.factor)}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1 ${
+                Math.abs(selectedBreathingFactor - act.factor) < 0.1
+                  ? "bg-[#0062ff] text-white shadow-sm shadow-blue-500/30 scale-102"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              }`}
+            >
+              <span>{act.icon}</span>
+              <span>{act.label}</span>
+              <span className="text-[9px] opacity-75 font-mono">{act.factor}x</span>
+            </button>
+          ))}
         </div>
 
-        <button
-          onClick={onToggleTracking}
-          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 ${
-            isTracking
-              ? "bg-slate-900 hover:bg-slate-800 text-white"
-              : "bg-[#0062ff] hover:bg-blue-600 text-white shadow-blue-500/25"
-          }`}
-        >
-          {isTracking ? (
-            <>
-              <Square className="w-3 h-3 fill-current" />
-              <span>Pause</span>
-            </>
-          ) : (
-            <>
-              <Play className="w-3 h-3 fill-current" />
-              <span>Start Tracking</span>
-            </>
-          )}
-        </button>
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          {/* Commute Simulator Trigger */}
+          <button
+            onClick={() => setIsSimulatorOpen(true)}
+            className="px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/80 shadow-sm flex items-center gap-1.5 transition-all hover:border-blue-300"
+          >
+            <Compass className="w-3.5 h-3.5 text-[#0062ff]" />
+            <span>Simulate Route</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-100 text-[#0062ff] font-extrabold">
+              AI
+            </span>
+          </button>
+
+          {/* Tracking Status Pill */}
+          <div className="flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full border border-slate-200/80 shadow-sm text-xs font-semibold text-slate-700">
+            <span className={`w-2 h-2 rounded-full ${isTracking ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+            <span>{isTracking ? "Live Dosimeter" : "Paused"}</span>
+          </div>
+
+          {/* Pause / Play Button */}
+          <button
+            onClick={onToggleTracking}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 ${
+              isTracking
+                ? "bg-slate-900 hover:bg-slate-800 text-white"
+                : "bg-[#0062ff] hover:bg-blue-600 text-white shadow-blue-500/25"
+            }`}
+          >
+            {isTracking ? (
+              <>
+                <Square className="w-3 h-3 fill-current" />
+                <span>Pause</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3 h-3 fill-current" />
+                <span>Resume</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Grid: 3 Hero Cards Matching WellMate Design */}
+      {/* Grid: 3 Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
         
-        {/* Card 1: Contrast Dark Card (Wellness Score / Inhalation Score) */}
-        <div className="lg:col-span-4 bg-[#0f1117] text-white rounded-[26px] p-6 shadow-card flex flex-col justify-between relative overflow-hidden">
-          {/* Subtle Ambient Light */}
-          <div className="absolute top-0 right-0 w-48 h-48 bg-blue-600/15 rounded-full blur-2xl pointer-events-none -mr-10 -mt-10" />
+        {/* Card 1: Contrast Obsidian Dark Card (Live PM2.5 Dosimeter + Breaths Pulse) */}
+        <div className="lg:col-span-4 bg-[#090d16] text-white rounded-[28px] p-6 shadow-xl border border-slate-800/80 flex flex-col justify-between relative overflow-hidden">
+          {/* Subtle Dynamic Ambient Pulse Glow */}
+          <div
+            className={`absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10 transition-all duration-700 ${
+              isTracking ? "bg-blue-500/25 animate-pulse" : "bg-slate-700/10"
+            }`}
+          />
 
           <div>
-            <div className="flex items-center justify-between mb-5">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                Inhalation Score
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                <HeartPulse className="w-4 h-4 text-blue-400" />
+                Live Inhalation Dosimeter
               </span>
-              <button className="text-slate-400 hover:text-white p-1">
-                <MoreHorizontal className="w-4 h-4" />
+              <button
+                onClick={() => setIsFormulaModalOpen(true)}
+                className="text-slate-400 hover:text-white p-1 transition-colors"
+                title="View mathematical kinetics"
+              >
+                <Info className="w-4 h-4" />
               </button>
             </div>
 
             <div className="flex items-center gap-5 my-2">
-              {/* Circular Gauge */}
+              {/* Radial Gauge with Real-time Breath Pulsing Halo */}
               <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96">
                   <circle
                     cx="48"
                     cy="48"
                     r="40"
-                    stroke="#1e2230"
+                    stroke="#1e2433"
                     strokeWidth="9"
                     fill="transparent"
                   />
@@ -247,10 +309,10 @@ export default function TodayExposureHero({
                     cx="48"
                     cy="48"
                     r="40"
-                    stroke="#0062ff"
+                    stroke={whoPercentage > 100 ? "#f43f5e" : whoPercentage > 75 ? "#f59e0b" : "#0062ff"}
                     strokeWidth="9"
                     strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
+                    strokeDashoffset={whoGaugeOffset}
                     strokeLinecap="round"
                     fill="transparent"
                     className="transition-all duration-700 ease-out"
@@ -260,21 +322,38 @@ export default function TodayExposureHero({
                   <span className="text-2xl font-black text-white font-mono tracking-tight leading-none">
                     {liveDisplayExposure.toFixed(1)}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-400 mt-0.5">μg</span>
+                  <span className="text-[10px] font-mono text-slate-400 mt-0.5">μg PM₂.₅</span>
                 </div>
               </div>
 
-              {/* Score Remarks */}
-              <div>
-                <div className="text-base font-bold text-white leading-tight">
-                  Low Exposure!
+              {/* Shock-Value Health Benchmarks */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-medium">Cigarette Impact:</span>
+                  <span className="inline-flex items-center gap-1 bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs font-black font-mono px-2 py-0.5 rounded-full">
+                    <Cigarette className="w-3 h-3 text-amber-400" />
+                    ~{liveCigarettes} cigs
+                  </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  You&apos;re 18% below your city average today.
-                </p>
-                <div className="mt-3">
-                  <span className="inline-flex items-center gap-1 bg-[#ccf82f] text-slate-950 text-[11px] font-extrabold px-3 py-1 rounded-full shadow-sm">
-                    ↑ 18% cleaner air
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-medium">WHO 24h Cap:</span>
+                  <span
+                    className={`text-xs font-black font-mono px-2 py-0.5 rounded-full ${
+                      whoPercentage <= 50
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        : whoPercentage <= 100
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                    }`}
+                  >
+                    {whoPercentage}% of limit
+                  </span>
+                </div>
+
+                <div className="pt-1">
+                  <span className="text-[10px] text-slate-500">
+                    Berkeley Earth standard: 20 µg PM2.5 ≈ 1 cigarette dose.
                   </span>
                 </div>
               </div>
@@ -282,27 +361,35 @@ export default function TodayExposureHero({
           </div>
 
           {/* Instant Rate Telemetry Footer */}
-          <div className="pt-4 mt-4 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
-            <span className="text-slate-400">Current Rate</span>
-            <span className="text-emerald-400 font-bold">
+          <div className="pt-3.5 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
+            <span className="text-slate-400 flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${isTracking ? "bg-emerald-400 animate-pulse" : "bg-slate-600"}`} />
+              Inhalation Velocity
+            </span>
+            <span className="text-emerald-400 font-extrabold text-sm">
               {currentRate > 0 ? `${currentRate.toFixed(5)} μg/s` : `${calculatedLiveRate.toFixed(5)} μg/s`}
             </span>
           </div>
         </div>
 
-        {/* Card 2: Micro-Environment Infiltration Progress */}
-        <div className="lg:col-span-4 bg-white rounded-[26px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between">
+        {/* Card 2: Micro-Environment Breakdown & Clean Air Shield */}
+        <div className="lg:col-span-4 bg-white rounded-[28px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Micro-Zone Breakdown
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-slate-400" />
+                Micro-Environment Breakdown
               </span>
-              <button className="text-slate-400 hover:text-slate-900 p-1">
-                <ArrowUpRight className="w-4 h-4" />
+              <button
+                onClick={() => setIsSimulatorOpen(true)}
+                className="text-xs text-[#0062ff] hover:underline font-bold flex items-center gap-0.5"
+              >
+                <span>Simulate</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="space-y-3.5 my-2">
+            <div className="space-y-3 my-2">
               {categories.map((cat) => {
                 const percentage = Math.min(100, Math.round((cat.raw / totalSafe) * 100));
                 return (
@@ -317,7 +404,6 @@ export default function TodayExposureHero({
                       </span>
                     </div>
 
-                    {/* Rounded Progress Track */}
                     <div className="h-2 w-full bg-[#f0f3f8] rounded-full overflow-hidden">
                       <div
                         style={{ width: `${Math.max(percentage, 5)}%` }}
@@ -330,48 +416,49 @@ export default function TodayExposureHero({
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Macro-Zone:</span>
-            <span className="font-bold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-full text-[11px]">
-              {placeName} ({infiltrationFactor.toFixed(2)})
+          {/* Clean Air Shield Banner */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500 flex items-center gap-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Clean Air Shield:</span>
+            </span>
+            <span className="font-extrabold text-emerald-600 font-mono text-xs bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+              +{shieldSavedUg > 0 ? shieldSavedUg : ((liveDisplayExposure * 0.45).toFixed(1))} μg saved
             </span>
           </div>
         </div>
 
-        {/* Card 3: Live Formula Variables, Calculation & Geofence Proximity */}
-        <div className="lg:col-span-4 bg-white rounded-[26px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between space-y-3">
+        {/* Card 3: Live Kinetic Variables & Geofence Radar */}
+        <div className="lg:col-span-4 bg-white rounded-[28px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between space-y-3">
           <div>
-            {/* Header with Info Button */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full bg-blue-50 text-[#0062ff] flex items-center justify-center">
                   <Compass className="w-3.5 h-3.5" />
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                  Rate Formula Variables
+                  Live Kinetic Variables
                 </span>
               </div>
               
               <div className="flex items-center gap-1.5">
-                {/* Info (i) Button for Formula Popup */}
                 <button
                   onClick={() => setIsFormulaModalOpen(true)}
-                  title="View Formula & Live Calculation"
-                  className="w-7 h-7 rounded-full bg-blue-50 hover:bg-blue-100 text-[#0062ff] border border-blue-200/60 flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-sm group"
+                  title="View Formula & Kinetics"
+                  className="w-7 h-7 rounded-full bg-blue-50 hover:bg-blue-100 text-[#0062ff] border border-blue-200/60 flex items-center justify-center transition-all shadow-sm"
                 >
-                  <Info className="w-3.5 h-3.5 transition-transform group-hover:rotate-12" />
+                  <Info className="w-3.5 h-3.5" />
                 </button>
 
                 <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1 font-mono">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live GPS
+                  Active Radar
                 </span>
               </div>
             </div>
 
-            {/* Live Formula Variable Matrix (4 Grid Tiles) */}
+            {/* 4 Variable Grid Tiles */}
             <div className="grid grid-cols-2 gap-2 mb-3">
-              {/* Variable 1: PM2.5 */}
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/90 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
                   <span className="flex items-center gap-1 text-slate-700">
@@ -390,14 +477,13 @@ export default function TodayExposureHero({
                 </div>
               </div>
 
-              {/* Variable 2: Infiltration Factor (If) */}
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/90 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
                   <span className="flex items-center gap-1 text-slate-700">
                     <Layers className="w-3 h-3 text-emerald-600" />
-                    I_f
+                    I_f (Infil)
                   </span>
-                  <span className="font-mono text-slate-400">Infil</span>
+                  <span className="font-mono text-slate-400">Factor</span>
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <span className="text-sm font-black text-emerald-600 font-mono">
@@ -409,31 +495,29 @@ export default function TodayExposureHero({
                 </div>
               </div>
 
-              {/* Variable 3: Breathing Activity (Bf) */}
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/90 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
                   <span className="flex items-center gap-1 text-slate-700">
                     <Activity className="w-3 h-3 text-purple-600" />
-                    B_f
+                    B_f (Exertion)
                   </span>
-                  <span className="font-mono text-slate-400">Activity</span>
+                  <span className="font-mono text-slate-400">Rate</span>
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <span className="text-sm font-black text-purple-600 font-mono">
                     {selectedBreathingFactor.toFixed(1)}×
                   </span>
                   <span className="text-[10px] text-slate-400 font-medium truncate ml-1">
-                    {getActivityName(selectedBreathingFactor)}
+                    Exertion
                   </span>
                 </div>
               </div>
 
-              {/* Variable 4: Tidal Ventilation (VE) */}
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100/90 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
                   <span className="flex items-center gap-1 text-slate-700">
                     <Zap className="w-3 h-3 text-amber-500" />
-                    V_E
+                    V_E (Tidal)
                   </span>
                   <span className="font-mono text-slate-400">6 L/min</span>
                 </div>
@@ -448,7 +532,7 @@ export default function TodayExposureHero({
               </div>
             </div>
 
-            {/* List of Closest Geofences */}
+            {/* Geofence Proximity List */}
             <div className="space-y-1.5">
               {placesWithDist.slice(0, 2).map((place) => {
                 const PlaceIcon = getPlaceIcon(place.location_type);
@@ -474,7 +558,7 @@ export default function TodayExposureHero({
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-slate-900 truncate leading-none">{place.name}</p>
                         <p className="text-[9px] text-slate-400 capitalize font-medium mt-0.5">
-                          {place.location_type} • {((1 - (place.indoor_coefficient ?? 0.5)) * 100).toFixed(0)}% filtered
+                          {place.location_type} • {((1 - (place.indoor_coefficient ?? 0.5)) * 100).toFixed(0)}% shielded
                         </p>
                       </div>
                     </div>
@@ -496,7 +580,7 @@ export default function TodayExposureHero({
             </div>
           </div>
 
-          {/* Footer: Last Pollution Updated & Spatio-Temporal Cache Status */}
+          {/* Footer: Cache Status */}
           <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
             <div className="flex items-center gap-1.5 text-slate-500 font-medium text-[11px]">
               <Clock className="w-3 h-3 text-slate-400" />
@@ -516,22 +600,28 @@ export default function TodayExposureHero({
 
       </div>
 
+      {/* Commute Simulator Modal */}
+      <CommuteSimulatorModal
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+        initialAmbientPm25={pm25Value}
+      />
+
       {/* Formula & Live Calculation Breakdown Modal */}
       {isFormulaModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[28px] max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden relative animate-in zoom-in-95 duration-200">
-            {/* Modal Header */}
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden relative animate-in zoom-in-95 duration-200">
             <div className="p-6 pb-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#0062ff] flex items-center justify-center">
+                <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#0062ff] flex items-center justify-center shadow-sm">
                   <Zap className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-slate-900">
-                    Live Rate Calculation &amp; Formula
+                    Live Rate Kinetics &amp; Formula
                   </h3>
                   <p className="text-xs text-slate-400 font-medium">
-                    Mathematical model breakdown using your current live telemetry
+                    Mathematical model breakdown based on ICRP &amp; Berkeley Earth
                   </p>
                 </div>
               </div>
@@ -544,14 +634,13 @@ export default function TodayExposureHero({
             </div>
 
             <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              {/* Formula Blueprint Banner */}
               <div className="p-4 rounded-2xl bg-slate-950 text-white space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400">
-                    Fundamental Formula
+                    Fundamental Equation
                   </span>
                   <span className="text-[10px] font-mono text-slate-400">
-                    ICRP Biokinetic Model
+                    Microgram Kinetics
                   </span>
                 </div>
                 <div className="py-1 font-mono text-sm sm:text-base font-extrabold text-white tracking-wide">
@@ -559,15 +648,14 @@ export default function TodayExposureHero({
                 </div>
               </div>
 
-              {/* Exact Live Value Substitution */}
               <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-[#0062ff]" />
-                    Live Parameter Substitution
+                    Current Numerical Substitution
                   </span>
                   <span className="text-[11px] font-mono font-bold text-[#0062ff]">
-                    Current Rate: {(calculatedLiveRate).toFixed(6)} μg/s
+                    Rate: {(calculatedLiveRate).toFixed(6)} μg/s
                   </span>
                 </div>
 
@@ -599,106 +687,36 @@ export default function TodayExposureHero({
                 </div>
               </div>
 
-              {/* Spatio-Temporal Cache Status Banner */}
-              <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/70 space-y-1.5">
+              {/* Health Conversion Benchmark */}
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/60 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-amber-600" />
-                    Spatio-Temporal Cache Policy (1 km / 30 min)
+                    <Cigarette className="w-3.5 h-3.5 text-amber-600" />
+                    Cigarette Equivalent Methodology
                   </span>
                   <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
-                    {current?.is_cached ? "Cache Active" : "Fresh Query"}
+                    Berkeley Earth
                   </span>
                 </div>
-                <p className="text-[11px] text-amber-800/90 leading-relaxed font-normal">
-                  Backend reuses saved pollution telemetry if requested within <strong>1.0 km</strong> and under <strong>30 minutes</strong>. New requests outside 1 km or past 30 minutes automatically trigger fresh OpenAQ API observations.
+                <p className="text-[11px] text-amber-900/90 leading-relaxed">
+                  1 cigarette is medically equivalent to inhaling ~20.0 µg of retained PM2.5 deep particulate. AirDose translates your cumulative microgram intake directly into transparent cigarette equivalents so you can make actionable lifestyle changes.
                 </p>
-                <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-amber-900/80">
-                  <span>Last Fetched: {current?.cached_at_display || "Recent"}</span>
-                  <span>Cache TTL: {Math.max(1, Math.round((current?.cache_expires_in_seconds ?? 1800) / 60))} mins remaining</span>
-                </div>
-              </div>
-
-              {/* Breakdown of Variables */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Variable Definitions &amp; Source
-                </h4>
-
-                <div className="space-y-2 text-xs">
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-lg bg-blue-100 text-[#0062ff] flex items-center justify-center shrink-0 font-bold font-mono text-[11px]">
-                      PM
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 flex items-center justify-between">
-                        <span>PM₂.₅ Ambient Concentration = {pm25Value.toFixed(1)} μg/m³</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Fine particulate matter reading fetched via OpenAQ Air Quality telemetry at your GPS coordinates.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 font-bold font-mono text-[11px]">
-                      I_f
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 flex items-center justify-between">
-                        <span>Infiltration Factor (I_f) = {infiltrationFactor.toFixed(2)}</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Micro-environment attenuation: 0.50 for Home (50% reduction), 0.40 for Office, 0.80 in Transit, and 1.00 Outdoor.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 font-bold font-mono text-[11px]">
-                      B_f
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 flex items-center justify-between">
-                        <span>Breathing Multiplier (B_f) = {selectedBreathingFactor.toFixed(1)}× ({getActivityName(selectedBreathingFactor)})</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Physical activity exertion multiplier (Resting 1.0×, Walking 1.5×, Exercise 2.2×, Heavy 3.0×).
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 font-bold font-mono text-[11px]">
-                      V_E
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 flex items-center justify-between">
-                        <span>Basal Respiration (V_E) = 0.0001 m³/s (6 L/min)</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Standard human resting tidal minute volume from international respiratory physiology standards (ICRP).
-                      </p>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* Modal Actions Footer */}
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
               <Link
                 href="/dashboard/details"
                 onClick={() => setIsFormulaModalOpen(false)}
-                className="text-xs font-bold text-[#0062ff] hover:text-blue-700 flex items-center gap-1 group"
+                className="text-xs font-bold text-[#0062ff] hover:text-blue-700 flex items-center gap-1"
               >
-                <span>Read Full Mathematical Paper &amp; Calculator</span>
-                <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                <span>Read Full Scientific Methodology</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
 
               <button
                 onClick={() => setIsFormulaModalOpen(false)}
-                className="px-4 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm"
+                className="px-5 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm"
               >
                 Close
               </button>
@@ -709,4 +727,3 @@ export default function TodayExposureHero({
     </div>
   );
 }
-

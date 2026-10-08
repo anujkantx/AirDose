@@ -1,5 +1,10 @@
 """Core scientific calculation engines, physical models, and domain constants."""
 
+from app.core.exposure import (
+    calculate_inhalation_rate,
+    calculate_exposure_increment,
+    should_close_segment,
+)
 from app.core.infiltration import calculate_infiltration_factor
 from app.core.aqi import (
     calculate_aqi,
@@ -12,24 +17,41 @@ from app.core.aqi import (
 )
 from app.core.haversine import haversine_distance
 from app.core.station_selector import select_best_station_for_location, score_station
+from app.core.location_resolver import resolve_user_environment
 from app.core.constants import (
     BASE_BREATHING_RATE_M3_S,
     DEFAULT_BREATHING_FACTOR,
+    BREATHING_FACTOR_CHANGE_THRESHOLD,
     DEFAULT_INDOOR_FACTOR,
     OUTDOOR_FACTOR,
+    MIN_INFILTRATION_FACTOR,
+    MAX_INFILTRATION_FACTOR,
+    CACHE_DISTANCE_METERS,
+    CACHE_TTL_SECONDS,
     POLLUTION_REFRESH_DISTANCE_M,
     POLLUTION_REFRESH_INTERVAL_SECONDS,
     EXPOSURE_CHECKPOINT_INTERVAL_SECONDS,
+    PM25_CHANGE_ABS_THRESHOLD,
+    PM25_CHANGE_REL_THRESHOLD,
+    MIN_SEGMENT_DURATION_SECONDS,
     DEFAULT_PLACE_RADIUS_METERS,
     MIN_PLACE_RADIUS_METERS,
     MAX_PLACE_RADIUS_METERS,
     HYSTERESIS_BUFFER_METERS,
     HYSTERESIS_SAMPLE_THRESHOLD,
+    WEIGHT_DISTANCE,
+    WEIGHT_FRESHNESS,
+    WEIGHT_SENSORS,
+    WEIGHT_QUALITY,
+    OPENAQ_BASE_URL,
     OPENAQ_SEARCH_RADIUS_METERS,
     OPENAQ_LOCATIONS_LIMIT,
 )
 
 __all__ = [
+    "calculate_inhalation_rate",
+    "calculate_exposure_increment",
+    "should_close_segment",
     "calculate_infiltration_factor",
     "calculate_aqi",
     "calculate_pm25_aqi",
@@ -41,18 +63,32 @@ __all__ = [
     "haversine_distance",
     "select_best_station_for_location",
     "score_station",
+    "resolve_user_environment",
     "BASE_BREATHING_RATE_M3_S",
     "DEFAULT_BREATHING_FACTOR",
+    "BREATHING_FACTOR_CHANGE_THRESHOLD",
     "DEFAULT_INDOOR_FACTOR",
     "OUTDOOR_FACTOR",
+    "MIN_INFILTRATION_FACTOR",
+    "MAX_INFILTRATION_FACTOR",
+    "CACHE_DISTANCE_METERS",
+    "CACHE_TTL_SECONDS",
     "POLLUTION_REFRESH_DISTANCE_M",
     "POLLUTION_REFRESH_INTERVAL_SECONDS",
     "EXPOSURE_CHECKPOINT_INTERVAL_SECONDS",
+    "PM25_CHANGE_ABS_THRESHOLD",
+    "PM25_CHANGE_REL_THRESHOLD",
+    "MIN_SEGMENT_DURATION_SECONDS",
     "DEFAULT_PLACE_RADIUS_METERS",
     "MIN_PLACE_RADIUS_METERS",
     "MAX_PLACE_RADIUS_METERS",
     "HYSTERESIS_BUFFER_METERS",
     "HYSTERESIS_SAMPLE_THRESHOLD",
+    "WEIGHT_DISTANCE",
+    "WEIGHT_FRESHNESS",
+    "WEIGHT_SENSORS",
+    "WEIGHT_QUALITY",
+    "OPENAQ_BASE_URL",
     "OPENAQ_SEARCH_RADIUS_METERS",
     "OPENAQ_LOCATIONS_LIMIT",
 ]

@@ -1,14 +1,26 @@
 """Station Selection Engine.
+
 Multi-factor suitability scoring algorithm for selecting the optimal air monitoring station
 based on distance, data freshness, sensor coverage (prioritizing PM2.5), and metadata quality.
+Zero dependencies on FastAPI or SQLite.
 """
 
 import math
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
-from app.core.haversine import haversine_distance
 
-# Weights for sensor coverage calculation
+from app.core.haversine import haversine_distance
+from app.core.constants import (
+    WEIGHT_DISTANCE,
+    WEIGHT_FRESHNESS,
+    WEIGHT_SENSORS,
+    WEIGHT_QUALITY,
+    STATION_PM25_MISSING_PENALTY,
+    DISTANCE_DECAY_HALF_LIFE_KM,
+    FRESHNESS_DECAY_HALF_LIFE_HOURS,
+)
+
+# Relative importance weights for sensor coverage
 POLLUTANT_WEIGHTS: Dict[str, float] = {
     "pm25": 1.0,
     "pm10": 0.7,
@@ -21,21 +33,15 @@ POLLUTANT_WEIGHTS: Dict[str, float] = {
 }
 MAX_SENSOR_POINTS: float = sum(POLLUTANT_WEIGHTS.values())
 
-# Score composition weights (Total = 1.0)
-WEIGHT_DISTANCE: float = 0.45
-WEIGHT_FRESHNESS: float = 0.35
-WEIGHT_SENSORS: float = 0.15
-WEIGHT_QUALITY: float = 0.05
-
 
 def calculate_distance_score(distance_km: float) -> float:
-    """Exponential distance decay score: exp(-distance_km / 10.0)."""
-    return math.exp(-max(0.0, distance_km) / 10.0)
+    """Exponential distance decay score: exp(-distance_km / DISTANCE_DECAY_HALF_LIFE_KM)."""
+    return math.exp(-max(0.0, distance_km) / DISTANCE_DECAY_HALF_LIFE_KM)
 
 
 def calculate_freshness_score(age_hours: float) -> float:
-    """Exponential freshness decay score: exp(-age_hours / 6.0)."""
-    return math.exp(-max(0.0, age_hours) / 6.0)
+    """Exponential freshness decay score: exp(-age_hours / FRESHNESS_DECAY_HALF_LIFE_HOURS)."""
+    return math.exp(-max(0.0, age_hours) / FRESHNESS_DECAY_HALF_LIFE_HOURS)
 
 
 def parse_station_timestamp(station: Dict[str, Any]) -> Optional[datetime]:
@@ -51,7 +57,6 @@ def parse_station_timestamp(station: Dict[str, Any]) -> Optional[datetime]:
         return None
 
     try:
-        # Handles ISO strings like '2026-10-07T14:30:00Z' or '+05:30'
         return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
     except Exception:
         return None
@@ -62,7 +67,7 @@ def calculate_sensor_score(sensors: List[Dict[str, Any]]) -> Tuple[float, bool, 
     found_pollutants = set()
     for s in sensors:
         p_obj = s.get("parameter", {})
-        p_name = p_obj.get("name", "").lower()
+        p_name = str(p_obj.get("name", "")).lower()
         if p_name == "relativehumidity":
             p_name = "humidity"
         if p_name:
@@ -86,7 +91,7 @@ def calculate_station_distance_km(user_lat: float, user_lon: float, station: Dic
         except (ValueError, TypeError):
             pass
 
-    # Fallback to coordinates
+    # Fallback to coordinate calculation
     coords = station.get("coordinates") or {}
     s_lat, s_lon = coords.get("latitude"), coords.get("longitude")
     if s_lat is not None and s_lon is not None:
@@ -144,8 +149,8 @@ def score_station(
         + WEIGHT_QUALITY * quality_score
     )
 
-    # PM2.5 is paramount for AirDose respiratory dose calculations: 40% penalty if missing
-    pm25_multiplier = 1.0 if has_pm25 else 0.60
+    # PM2.5 is paramount for AirDose respiratory dose calculations: penalty if missing
+    pm25_multiplier = 1.0 if has_pm25 else STATION_PM25_MISSING_PENALTY
     final_score = round(raw_composite * pm25_multiplier, 4)
 
     # Confidence classification
@@ -217,19 +222,15 @@ def select_best_station_for_location(
     if not candidate_stations:
         return None
 
-    # Step 1: Filter stations having active sensors
     valid_candidates = [s for s in candidate_stations if s.get("sensors")]
     if not valid_candidates:
         return None
 
-    # Step 2: Score each candidate station
     now_utc = datetime.now(timezone.utc)
     scored_candidates = [
         score_station(user_lat, user_lon, station, now=now_utc)
         for station in valid_candidates
     ]
 
-    # Step 3: Sort by highest score descending
     scored_candidates.sort(key=lambda x: x["score"], reverse=True)
-
     return scored_candidates[0]

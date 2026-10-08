@@ -1,10 +1,11 @@
 """Air Quality Service for AirDose.
 
 Responsibilities:
-- Interfacing with openaq_api dependency for spatial caching, station selection & sensor readings.
-- Sensor selection, unit normalization, and deduplication.
-- Computing composite & sub-index AQI using core scientific calculation engines.
-- Formatting full telemetry responses for dashboard, API routers, and exposure trackers.
+- Coordinates spatial caching, OpenAQ client communication, station selection, and sensor reading fetches.
+- Normalizes pollutant parameters and units.
+- Calculates AQI and sub-indices via core calculation engine.
+- Assembles normalized air quality telemetry responses for API routes and exposure tracking.
+- Clearly flags data source quality (LIVE, CACHED, STALE, FALLBACK, DEMO, UNAVAILABLE).
 """
 
 from __future__ import annotations
@@ -16,19 +17,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
-from app.core import (
-    POLLUTION_REFRESH_INTERVAL_SECONDS,
-    calculate_aqi,
+from app.core.aqi import calculate_aqi
+from app.core.station_selector import select_best_station_for_location
+from app.core.constants import (
+    CACHE_TTL_SECONDS,
+    OPENAQ_HTTP_TIMEOUT_SECONDS,
 )
-from app.dependencies.openaq_api import (
-    get_openaq_headers,
-    get_cached_observation,
-    cache_observation,
-    select_nearest_best_station,
-    fetch_sensor_latest_measurement,
-)
-
-CACHE_TTL_SECONDS = POLLUTION_REFRESH_INTERVAL_SECONDS
+from app.integrations.openaq.client import openaq_client, OpenAQClient
+from app.integrations.cache.spatial_cache import spatial_temporal_cache, SpatialTemporalCache
 
 TARGET_PARAMETERS = {
     "pm25",
@@ -101,7 +97,38 @@ def _format_timestamp(value: Any) -> Optional[str]:
 
 
 class AirQualityService:
-    """Service handling air quality domain logic, sensor orchestration, and AQI computation."""
+    """Service handling air quality observation orchestration, caching, and AQI computation."""
+
+    def __init__(
+        self,
+        client: Optional[OpenAQClient] = None,
+        cache: Optional[SpatialTemporalCache] = None,
+    ):
+        self.client = client or openaq_client
+        self.cache = cache or spatial_temporal_cache
+
+    def get_cached_pm25(self, lat: Optional[float] = None, lon: Optional[float] = None) -> Optional[Dict[str, Any]]:
+        """Safely retrieves cached PM2.5 reading and metadata for coordinates or latest cache."""
+        cached = None
+        if lat is not None and lon is not None:
+            cached = self.cache.get_observation(lat, lon)
+        if not cached:
+            cached = self.cache.get_latest_observation()
+
+        if cached and cached.get("pollutants", {}).get("pm25", {}).get("value") is not None:
+            pm25_val = float(cached["pollutants"]["pm25"]["value"])
+            return {
+                "pm25": pm25_val,
+                "aqi": cached.get("aqi"),
+                "is_cached": True,
+                "cache_age_seconds": cached.get("cache_age_seconds", 0),
+                "cache_expires_in_seconds": cached.get("cache_expires_in_seconds", CACHE_TTL_SECONDS),
+                "cache_distance_meters": cached.get("cache_distance_meters", 0.0),
+                "cached_at": cached.get("cached_at"),
+                "cached_at_display": cached.get("cached_at_display"),
+                "observed_at": cached.get("data_quality", {}).get("observed_at"),
+            }
+        return None
 
     def _select_sensors_to_fetch(self, station: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Deduplicates sensors prioritizing standard metric units."""
@@ -129,7 +156,7 @@ class AirQualityService:
         return selected
 
     async def _fetch_station_pollutants(
-        self, station: Dict[str, Any], client: httpx.AsyncClient
+        self, station: Dict[str, Any], http_client: httpx.AsyncClient
     ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Concurrently queries OpenAQ sensor measurements for the chosen station."""
         sensors = self._select_sensors_to_fetch(station)
@@ -140,7 +167,7 @@ class AirQualityService:
             p_name = str(p_obj.get("name") or "").lower()
             clean_key = "humidity" if p_name == "relativehumidity" else p_name
 
-            raw_m = await fetch_sensor_latest_measurement(s_id, client=client)
+            raw_m = await self.client.fetch_sensor_latest_measurement(s_id, client=http_client)
             if not raw_m or raw_m.get("value") is None:
                 return None, None
 
@@ -154,7 +181,7 @@ class AirQualityService:
 
             return clean_key, {
                 "value": round(float(raw_m["value"]), 2),
-                "unit": p_obj.get("units") or "unknown",
+                "unit": p_obj.get("units") or "µg/m³",
                 "label": p_obj.get("displayName") or p_name.upper(),
                 "observed_at": observed_at,
                 "sensor_id": s_id,
@@ -174,14 +201,14 @@ class AirQualityService:
 
         return pollutants, latest_time
 
-    def _build_synthetic_demo_payload(self, lat: float, lon: float, fetched_at: str) -> Dict[str, Any]:
+    def _build_demo_payload(self, lat: float, lon: float, fetched_at: str, reason: str = "demo") -> Dict[str, Any]:
         """Builds demo telemetry response when OpenAQ API key is not configured."""
         pm25 = 78.4
         aqi_meta = calculate_aqi({"pm25": {"value": pm25}})
 
         return {
             "status": "success",
-            "source": "synthetic_demo",
+            "source": "demo_mode" if reason == "demo" else "fallback_mode",
             "coordinates": {"latitude": lat, "longitude": lon},
             "aqi": aqi_meta["aqi"],
             "dominant_pollutant": "PM2.5 (Fine Particulate Matter)",
@@ -199,20 +226,21 @@ class AirQualityService:
             },
             "station": {
                 "id": 0,
-                "name": "Synthetic Demo Station",
+                "name": "Demo Air Station" if reason == "demo" else "Fallback Air Station",
                 "distance_km": 0.0,
-                "provider": "Demo Mode (API Key Missing)",
+                "provider": "Demo Provider (API Key Missing)" if reason == "demo" else "Fallback (Network Unavailable)",
                 "latitude": lat,
                 "longitude": lon,
                 "last_updated": fetched_at,
                 "selection_score": None,
-                "confidence": "demo",
+                "confidence": "demo" if reason == "demo" else "fallback",
             },
             "data_quality": {
-                "source": "synthetic_demo",
+                "source": "DEMO" if reason == "demo" else "FALLBACK",
                 "observed_at": fetched_at,
                 "fetched_at": fetched_at,
                 "is_cached": False,
+                "status": "DEMO" if reason == "demo" else "FALLBACK",
             },
             "fetched_at": fetched_at,
             "fetched_at_display": _display_time(),
@@ -229,10 +257,10 @@ class AirQualityService:
     async def get_air_quality_telemetry(
         self, lat: float, lon: float, force_refresh: bool = False
     ) -> Dict[str, Any]:
-        """Fetches complete air quality telemetry using spatio-temporal caching in openaq_api."""
-        # 1. Check spatio-temporal cache in openaq_api dependency
+        """Fetches complete normalized air quality telemetry using spatio-temporal caching."""
+        # 1. Check spatio-temporal cache
         if not force_refresh:
-            cached = get_cached_observation(lat, lon)
+            cached = self.cache.get_observation(lat, lon)
             if cached is not None:
                 return cached
 
@@ -240,38 +268,26 @@ class AirQualityService:
         timestamp = time.time()
         display_t = _display_time()
 
-        headers = get_openaq_headers()
-        if not headers:
-            demo_res = self._build_synthetic_demo_payload(lat, lon, fetched_at)
-            cache_observation(lat, lon, demo_res, timestamp, fetched_at, display_t)
+        # Check API key configuration
+        if not self.client.has_api_key:
+            demo_res = self._build_demo_payload(lat, lon, fetched_at, reason="demo")
+            self.cache.store_observation(lat, lon, demo_res, timestamp, fetched_at, display_t)
             return demo_res
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                # 2. Select optimal station via openaq_api
-                selection_result = await select_nearest_best_station(lat, lon, client=client)
+            async with httpx.AsyncClient(timeout=OPENAQ_HTTP_TIMEOUT_SECONDS) as http_client:
+                # 2. Fetch candidates & select optimal station
+                candidates = await self.client.fetch_candidate_locations(lat, lon, client=http_client)
+                if not candidates:
+                    fallback_res = self._build_demo_payload(lat, lon, fetched_at, reason="fallback")
+                    self.cache.store_observation(lat, lon, fallback_res, timestamp, fetched_at, display_t)
+                    return fallback_res
 
+                selection_result = select_best_station_for_location(lat, lon, candidates)
                 if not selection_result:
-                    return {
-                        "status": "success",
-                        "source": "OpenAQ",
-                        "coordinates": {"latitude": lat, "longitude": lon},
-                        "aqi": 0,
-                        "dominant_pollutant": None,
-                        "dominant_pollutant_key": None,
-                        "pollutant_aqis": {},
-                        "pollutants": {},
-                        "station": None,
-                        "data_quality": {"source": "OpenAQ", "observed_at": None, "fetched_at": fetched_at, "is_cached": False},
-                        "fetched_at": fetched_at,
-                        "fetched_at_display": display_t,
-                        "is_cached": False,
-                        "cache_age_seconds": 0,
-                        "cache_expires_in_seconds": CACHE_TTL_SECONDS,
-                        "cache_distance_meters": 0.0,
-                        "cache_anchor_lat": lat,
-                        "cache_anchor_lon": lon,
-                    }
+                    fallback_res = self._build_demo_payload(lat, lon, fetched_at, reason="fallback")
+                    self.cache.store_observation(lat, lon, fallback_res, timestamp, fetched_at, display_t)
+                    return fallback_res
 
                 selected_station = selection_result["station"]
                 provider = selected_station.get("provider") or {}
@@ -296,7 +312,7 @@ class AirQualityService:
                 }
 
                 # 3. Fetch sensor measurements for chosen station
-                pollutants, latest_obs_time = await self._fetch_station_pollutants(selected_station, client)
+                pollutants, latest_obs_time = await self._fetch_station_pollutants(selected_station, http_client)
                 if latest_obs_time:
                     station_info["last_updated"] = latest_obs_time
 
@@ -325,6 +341,7 @@ class AirQualityService:
                         "observed_at": observed_at,
                         "fetched_at": fetched_at,
                         "is_cached": False,
+                        "status": "LIVE",
                     },
                     "fetched_at": fetched_at,
                     "fetched_at_display": display_t,
@@ -338,17 +355,14 @@ class AirQualityService:
                     "cached_at_display": display_t,
                 }
 
-                # 5. Store in spatio-temporal cache inside openaq_api
-                cache_observation(lat, lon, result, timestamp, fetched_at, display_t)
+                # 5. Store in spatio-temporal cache
+                self.cache.store_observation(lat, lon, result, timestamp, fetched_at, display_t)
                 return result
 
         except Exception as exc:
             print(f"[AirQualityService] Error querying OpenAQ: {exc}")
-            fallback_res = self._build_synthetic_demo_payload(lat, lon, fetched_at)
-            fallback_res["source"] = "synthetic_fallback"
-            fallback_res["station"]["name"] = "Synthetic Fallback Station"
-            fallback_res["station"]["provider"] = "OpenAQ unavailable"
-            cache_observation(lat, lon, fallback_res, timestamp, fetched_at, display_t)
+            fallback_res = self._build_demo_payload(lat, lon, fetched_at, reason="fallback")
+            self.cache.store_observation(lat, lon, fallback_res, timestamp, fetched_at, display_t)
             return fallback_res
 
 

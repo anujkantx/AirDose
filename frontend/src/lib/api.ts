@@ -223,6 +223,47 @@ export interface TodayExposureData {
   current: CurrentExposureInfo | null;
   contributions: Record<string, number>;
   tracking: boolean;
+  cigarettes_equivalent?: number;
+  who_percentage?: number;
+  who_status?: string;
+  clean_air_shield_saved_ug?: number;
+}
+
+export interface TransitModeSimulation {
+  mode: string;
+  key: string;
+  icon: string;
+  infiltration_factor: number;
+  breathing_factor: number;
+  inhalation_rate_ug_s: number;
+  estimated_dose_ug: number;
+  cigarettes_equivalent: number;
+}
+
+export interface TripSimulationResponse {
+  duration_minutes: number;
+  ambient_pm25: number;
+  options: TransitModeSimulation[];
+  safest_mode: string;
+  max_dose_savings_ug: number;
+}
+
+export async function simulateTripApi(
+  durationMinutes: number = 30,
+  ambientPm25: number = 80
+): Promise<TripSimulationResponse> {
+  const res = await fetch(`${API_BASE}/api/exposure/simulate-trip`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      duration_minutes: durationMinutes,
+      ambient_pm25: ambientPm25,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error("Failed to simulate trip exposure");
+  }
+  return res.json();
 }
 
 export interface ExposureHistoryPoint {

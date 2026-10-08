@@ -1,44 +1,29 @@
 """User Service for AirDose.
-Handles user registration, lookup, authentication, and profile management CRUD.
+
+Handles user registration, lookup, authentication, and profile management.
 """
 
 from typing import Optional, Dict, Any
-from app.db.connection import get_db
+from app.repositories.user_repository import UserRepository
 
 
 class UserService:
-    """Provides CRUD operations for User accounts."""
+    """Provides operations for User accounts using the repository layer."""
 
     @staticmethod
     def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         """Retrieves a user by their email address."""
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name, email, password, created_at FROM users WHERE email = ?", (email.strip(),))
-            row = cursor.fetchone()
-            return dict(row) if row else None
+        return UserRepository.get_by_email(email)
 
     @staticmethod
     def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
         """Retrieves a user by their unique primary ID."""
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name, email, password, created_at FROM users WHERE id = ?", (user_id,))
-            row = cursor.fetchone()
-            return dict(row) if row else None
+        return UserRepository.get_by_id(user_id)
 
     @staticmethod
     def create_user(name: str, email: str, password: str) -> Dict[str, Any]:
-        """Creates a new user account in SQLite."""
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-                (name.strip(), email.strip().lower(), password.strip())
-            )
-            user_id = cursor.lastrowid
-            cursor.execute("SELECT id, name, email, created_at FROM users WHERE id = ?", (user_id,))
-            return dict(cursor.fetchone())
+        """Creates a new user account."""
+        return UserRepository.create_user(name=name, email=email, password=password)
 
 
 # Standalone function aliases for direct functional usage & backward compatibility
