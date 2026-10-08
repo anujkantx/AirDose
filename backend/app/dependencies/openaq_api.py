@@ -70,13 +70,13 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
     }
 
     station_info = {
-        "id": 17,
-        "name": "R K Puram Monitoring Station, Delhi - DPCC",
-        "distance_km": 4.2,
-        "provider": "CPCB / DPCC",
-        "latitude": 28.5632,
-        "longitude": 77.1869,
-        "last_updated": "Live Telemetry",
+        "id": 999,
+        "name": "Simulated Ambient Monitoring Node (Demo / Test Data)",
+        "distance_km": 1.8,
+        "provider": "Synthetic Ambient Sensor Model",
+        "latitude": round(lat, 4),
+        "longitude": round(lon, 4),
+        "last_updated": "Simulated Live Telemetry",
     }
 
     try:
