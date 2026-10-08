@@ -15,7 +15,7 @@ from app.schemas import (
     ExposureHistoryResponse,
     TrackLocationRequest,
 )
-from app.auth_deps import get_current_user_id
+from app.dependencies import get_current_user_id
 from app.services.exposure_service import exposure_service
 from app.services.daily_exposure_service import DailyExposureService
 from app.services.air_quality_service import air_quality_service
