@@ -9,7 +9,7 @@ Provides endpoints for:
 
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from app.models import (
+from app.schemas import (
     TodayExposureResponse,
     CurrentExposureInfo,
     ExposureHistoryResponse,

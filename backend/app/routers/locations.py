@@ -8,7 +8,7 @@ from app.database import (
     update_user_location,
     get_user_location_by_id,
 )
-from app.models import UserLocationCreate, UserLocationUpdate, UserLocationOut, LocationQuestionnaire
+from app.schemas import UserLocationCreate, UserLocationUpdate, UserLocationOut, LocationQuestionnaire
 from app.auth_deps import get_current_user_id
 from app.core import calculate_infiltration_factor
 
