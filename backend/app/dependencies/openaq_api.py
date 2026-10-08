@@ -93,35 +93,37 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
                 loc_data = res.json()
                 results = loc_data.get("results", [])
 
-                # Helper to compute distance to each candidate station
-                def calc_station_dist(loc: Dict[str, Any]) -> float:
-                    if "distance" in loc and loc["distance"] is not None:
-                        return float(loc["distance"])
-                    c = loc.get("coordinates") or {}
-                    s_lat, s_lon = c.get("latitude"), c.get("longitude")
-                    if s_lat is not None and s_lon is not None:
-                        return haversine_distance(lat, lon, float(s_lat), float(s_lon))
+                # Extract distance directly from OpenAQ response (distance_meters or distance)
+                def get_station_dist_meters(loc: Dict[str, Any]) -> float:
+                    d = loc.get("distance_meters")
+                    if d is None:
+                        d = loc.get("distance")
+                    if d is not None:
+                        try:
+                            return float(d)
+                        except (ValueError, TypeError):
+                            pass
                     return float("inf")
 
                 # Filter valid locations having sensors
                 valid_locations = [loc for loc in results if loc.get("sensors")]
 
-                # Prioritize stations having active PM2.5 sensor, then sort by distance
+                # Prioritize stations having active PM2.5 sensor, then sort by native distance_meters
                 pm25_locations = [
                     loc for loc in valid_locations
                     if any(s.get("parameter", {}).get("name", "").lower() == "pm25" for s in loc.get("sensors", []))
                 ]
                 candidates = pm25_locations if pm25_locations else valid_locations
 
-                best_loc = min(candidates, key=calc_station_dist) if candidates else None
+                best_loc = min(candidates, key=get_station_dist_meters) if candidates else None
 
                 if best_loc:
                     station_lat = best_loc.get("coordinates", {}).get("latitude", lat)
                     station_lon = best_loc.get("coordinates", {}).get("longitude", lon)
-                    dist_m = calc_station_dist(best_loc)
+                    dist_m = get_station_dist_meters(best_loc)
                     dist_km = round(dist_m / 1000.0, 2) if dist_m != float("inf") else 0.0
 
-                    last_up = best_loc.get("datetimeLast")
+                    last_up = best_loc.get("last_measurement") or best_loc.get("datetimeLast")
                     if isinstance(last_up, dict):
                         last_up_str = last_up.get("local") or last_up.get("utc") or "Recent Fix"
                     else:
