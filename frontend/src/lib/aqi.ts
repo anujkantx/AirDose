@@ -102,4 +102,5 @@ export function getAqiCategory(aqi: number): AqiInfo {
       bgLight: "bg-red-50",
       textColor: "text-red-900",
     };
+  }
 }

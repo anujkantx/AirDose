@@ -11,7 +11,7 @@ from app.core.constants import (
     POLLUTION_REFRESH_INTERVAL_SECONDS,
 )
 from app.db.connection import get_db
-from app.services.openaq_service import fetch_openaq_air_quality
+from app.dependencies.openaq_api import fetch_openaq_air_quality
 
 
 # ------------------- CRUD for Air Quality Observations -------------------

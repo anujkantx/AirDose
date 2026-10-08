@@ -1,4 +1,4 @@
-"""OpenAQ Air Quality Integration Service.
+"""OpenAQ Air Quality API Client Dependency.
 Fetches real-time air quality metrics and pollutants (PM2.5, PM10, NO2, O3, CO, SO2)
 from the OpenAQ v3 API with spatio-temporal caching (1.0 km / 30 minutes).
 """
