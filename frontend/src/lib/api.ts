@@ -342,14 +342,14 @@ export interface AirQualityData {
   source: string;
   coordinates: { latitude: number; longitude: number };
   aqi: number;
-  category: string;
-  level: string;
+  category?: string;
+  level?: string;
   color?: string;
   badgeClass?: string;
-  description: string;
-  recommendation: string;
-  mask_needed: boolean;
-  purifier_needed: boolean;
+  description?: string;
+  recommendation?: string;
+  mask_needed?: boolean;
+  purifier_needed?: boolean;
   dominant_pollutant: string;
   pollutants: {
     pm25?: PollutantDetail;

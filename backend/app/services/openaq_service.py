@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import httpx
 from dotenv import load_dotenv
 
-from app.core.aqi import calculate_pm25_aqi, get_aqi_category
+from app.core.aqi import calculate_pm25_aqi
 from app.services.location_service import haversine_distance
 
 # Load environment variables
@@ -146,7 +146,6 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
     # Calculate AQI from PM2.5 or fallback
     pm25_val = pollutants.get("pm25", {}).get("value", 75.0)
     aqi_score = calculate_pm25_aqi(pm25_val)
-    category_info = get_aqi_category(aqi_score)
 
     # 24-hour trend generation
     trend_history: List[Dict[str, Any]] = []
@@ -174,12 +173,6 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
         "source": "OpenAQ Global Clean Air Network",
         "coordinates": {"latitude": lat, "longitude": lon},
         "aqi": aqi_score,
-        "category": category_info["category"],
-        "level": category_info["level"],
-        "description": category_info["description"],
-        "recommendation": category_info["recommendation"],
-        "mask_needed": category_info["mask_needed"],
-        "purifier_needed": category_info["purifier_needed"],
         "dominant_pollutant": "PM2.5 (Fine Particulate Matter)",
         "pollutants": pollutants,
         "station": station_info,

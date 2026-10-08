@@ -11,6 +11,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { AirQualityData } from "@/lib/api";
+import { getAqiCategory } from "@/lib/aqi";
 
 interface AirQualityHeroProps {
   data: AirQualityData | null;
@@ -28,17 +29,8 @@ export default function AirQualityHero({ data, loading }: AirQualityHeroProps) {
     );
   }
 
-  const { aqi, category, description, recommendation, mask_needed, purifier_needed, station } = data;
-
-  const getAqiBadge = () => {
-    if (aqi <= 50) return { bg: "bg-emerald-50 text-emerald-700 border-emerald-200", dot: "bg-emerald-500" };
-    if (aqi <= 100) return { bg: "bg-amber-50 text-amber-700 border-amber-200", dot: "bg-amber-500" };
-    if (aqi <= 150) return { bg: "bg-orange-50 text-orange-700 border-orange-200", dot: "bg-orange-500" };
-    if (aqi <= 200) return { bg: "bg-rose-50 text-rose-700 border-rose-200", dot: "bg-rose-500" };
-    return { bg: "bg-purple-50 text-purple-700 border-purple-200", dot: "bg-purple-500" };
-  };
-
-  const badge = getAqiBadge();
+  const { aqi } = data;
+  const aqiInfo = getAqiCategory(aqi);
 
   return (
     <div className="bg-white rounded-[26px] p-6 sm:p-7 border border-slate-100 shadow-soft">
@@ -59,9 +51,9 @@ export default function AirQualityHero({ data, loading }: AirQualityHeroProps) {
               {aqi}
             </div>
             <div>
-              <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${badge.bg}`}>
-                <span className={`w-2 h-2 rounded-full ${badge.dot}`} />
-                {category}
+              <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-full border ${aqiInfo.badgeClass}`}>
+                <span className={`w-2 h-2 rounded-full ${aqiInfo.dotClass}`} />
+                {aqiInfo.category}
               </span>
               <p className="text-xs text-slate-400 font-medium mt-1">
                 Dominant: PM2.5 particles
@@ -70,7 +62,7 @@ export default function AirQualityHero({ data, loading }: AirQualityHeroProps) {
           </div>
 
           <p className="text-xs text-slate-500 mt-3 leading-relaxed">
-            {description}
+            {aqiInfo.description}
           </p>
         </div>
 
@@ -81,20 +73,20 @@ export default function AirQualityHero({ data, loading }: AirQualityHeroProps) {
             <ShieldAlert className="w-5 h-5 text-[#0062ff] shrink-0 mt-0.5" />
             <div>
               <h4 className="text-xs font-bold text-slate-900">HEALTH RECOMMENDATION</h4>
-              <p className="text-xs text-slate-600 mt-0.5">{recommendation}</p>
+              <p className="text-xs text-slate-600 mt-0.5">{aqiInfo.recommendation}</p>
             </div>
           </div>
 
           {/* Action Pills */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div className={`p-3 rounded-2xl border flex flex-col justify-between ${mask_needed ? "bg-amber-50/70 border-amber-200 text-amber-900" : "bg-[#f0f3f8] border-slate-200 text-slate-600"}`}>
+            <div className={`p-3 rounded-2xl border flex flex-col justify-between ${aqiInfo.mask_needed ? "bg-amber-50/70 border-amber-200 text-amber-900" : "bg-[#f0f3f8] border-slate-200 text-slate-600"}`}>
               <span className="text-[10px] font-bold uppercase text-slate-400">N95 Mask</span>
-              <span className="font-bold text-xs mt-1">{mask_needed ? "Required Outside" : "Optional"}</span>
+              <span className="font-bold text-xs mt-1">{aqiInfo.mask_needed ? "Required Outside" : "Optional"}</span>
             </div>
 
-            <div className={`p-3 rounded-2xl border flex flex-col justify-between ${purifier_needed ? "bg-blue-50/70 border-blue-200 text-blue-900" : "bg-[#f0f3f8] border-slate-200 text-slate-600"}`}>
+            <div className={`p-3 rounded-2xl border flex flex-col justify-between ${aqiInfo.purifier_needed ? "bg-blue-50/70 border-blue-200 text-blue-900" : "bg-[#f0f3f8] border-slate-200 text-slate-600"}`}>
               <span className="text-[10px] font-bold uppercase text-slate-400">Air Purifier</span>
-              <span className="font-bold text-xs mt-1">{purifier_needed ? "Run HEPA Filter" : "Standby"}</span>
+              <span className="font-bold text-xs mt-1">{aqiInfo.purifier_needed ? "Run HEPA Filter" : "Standby"}</span>
             </div>
 
             <div className="p-3 rounded-2xl bg-[#f0f3f8] border border-slate-200 flex flex-col justify-between text-slate-700">
