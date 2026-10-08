@@ -57,8 +57,8 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
                     cached_data["fetched_at_display"] = entry.get("display_time", "")
                     return cached_data
 
-    # 2. Fresh OpenAQ fetch required
-    headers = {"X-API-Key": OPENAQ_API_KEY} if OPENAQ_API_KEY else {}
+    # 2. Check API key configuration
+    api_key = (os.getenv("OPENAQ_API_KEY") or OPENAQ_API_KEY or "").strip()
 
     pollutants: Dict[str, Any] = {
         "pm25": {"value": 78.4, "unit": "µg/m³", "label": "PM2.5", "status": "Moderate"},
@@ -71,134 +71,150 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
         "humidity": {"value": 54, "unit": "%", "label": "Humidity", "status": "Comfortable"},
     }
 
-    station_info = {
-        "id": 999,
-        "name": "Simulated Ambient Monitoring Node (Demo / Test Data)",
-        "distance_km": 1.8,
-        "provider": "Synthetic Ambient Sensor Model",
-        "latitude": round(lat, 4),
-        "longitude": round(lon, 4),
-        "last_updated": "Simulated Live Telemetry",
-    }
+    if not api_key:
+        # OPENAQ_API_KEY is empty / not set: Return synthetic demo data with explicit station metadata
+        source_name = "Synthetic Telemetry (OPENAQ_API_KEY not configured)"
+        station_info = {
+            "id": 0,
+            "name": "Simulated Ambient Monitoring Node (Demo - API Key Not Set)",
+            "distance_km": 0.0,
+            "provider": "Synthetic Sensor Model (Set OPENAQ_API_KEY for live data)",
+            "latitude": round(lat, 4),
+            "longitude": round(lon, 4),
+            "last_updated": "Demo Mode (API Key Missing)",
+        }
+    else:
+        # OPENAQ_API_KEY is present: Query OpenAQ Global Network
+        headers = {"X-API-Key": api_key}
+        source_name = "OpenAQ Global Clean Air Network"
+        station_info = {
+            "id": 0,
+            "name": "No Active Station Found within 25km (Fallback)",
+            "distance_km": 0.0,
+            "provider": "Government Air Network",
+            "latitude": round(lat, 4),
+            "longitude": round(lon, 4),
+            "last_updated": "Fallback Telemetry",
+        }
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            # Query nearest locations within 25km radius
-            res = await client.get(
-                f"{OPENAQ_BASE_URL}/locations",
-                headers=headers,
-                params={"coordinates": f"{lat},{lon}", "radius": 25000, "limit": 10},
-            )
-            if res.status_code == 200:
-                loc_data = res.json()
-                results = loc_data.get("results", [])
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # Query nearest locations within 25km radius
+                res = await client.get(
+                    f"{OPENAQ_BASE_URL}/locations",
+                    headers=headers,
+                    params={"coordinates": f"{lat},{lon}", "radius": 25000, "limit": 10},
+                )
+                if res.status_code == 200:
+                    loc_data = res.json()
+                    results = loc_data.get("results", [])
 
-                # Extract distance directly from OpenAQ response (distance_meters or distance)
-                def get_station_dist_meters(loc: Dict[str, Any]) -> float:
-                    d = loc.get("distance_meters")
-                    if d is None:
-                        d = loc.get("distance")
-                    if d is not None:
-                        try:
-                            return float(d)
-                        except (ValueError, TypeError):
-                            pass
-                    return float("inf")
+                    # Extract distance directly from OpenAQ response (distance_meters or distance)
+                    def get_station_dist_meters(loc: Dict[str, Any]) -> float:
+                        d = loc.get("distance_meters")
+                        if d is None:
+                            d = loc.get("distance")
+                        if d is not None:
+                            try:
+                                return float(d)
+                            except (ValueError, TypeError):
+                                pass
+                        return float("inf")
 
-                # Filter valid locations having sensors
-                valid_locations = [loc for loc in results if loc.get("sensors")]
+                    # Filter valid locations having sensors
+                    valid_locations = [loc for loc in results if loc.get("sensors")]
 
-                # Prioritize stations having active PM2.5 sensor, then sort by native distance_meters
-                pm25_locations = [
-                    loc for loc in valid_locations
-                    if any(s.get("parameter", {}).get("name", "").lower() == "pm25" for s in loc.get("sensors", []))
-                ]
-                candidates = pm25_locations if pm25_locations else valid_locations
+                    # Prioritize stations having active PM2.5 sensor, then sort by native distance_meters
+                    pm25_locations = [
+                        loc for loc in valid_locations
+                        if any(s.get("parameter", {}).get("name", "").lower() == "pm25" for s in loc.get("sensors", []))
+                    ]
+                    candidates = pm25_locations if pm25_locations else valid_locations
 
-                best_loc = min(candidates, key=get_station_dist_meters) if candidates else None
+                    best_loc = min(candidates, key=get_station_dist_meters) if candidates else None
 
-                if best_loc:
-                    station_lat = best_loc.get("coordinates", {}).get("latitude", lat)
-                    station_lon = best_loc.get("coordinates", {}).get("longitude", lon)
-                    dist_m = get_station_dist_meters(best_loc)
-                    dist_km = round(dist_m / 1000.0, 2) if dist_m != float("inf") else 0.0
+                    if best_loc:
+                        station_lat = best_loc.get("coordinates", {}).get("latitude", lat)
+                        station_lon = best_loc.get("coordinates", {}).get("longitude", lon)
+                        dist_m = get_station_dist_meters(best_loc)
+                        dist_km = round(dist_m / 1000.0, 2) if dist_m != float("inf") else 0.0
 
-                    last_up = best_loc.get("last_measurement") or best_loc.get("datetimeLast")
-                    if isinstance(last_up, dict):
-                        last_up_str = last_up.get("local") or last_up.get("utc") or "Recent Fix"
-                    else:
-                        last_up_str = str(last_up) if last_up else "Recent Fix"
+                        last_up = best_loc.get("last_measurement") or best_loc.get("datetimeLast")
+                        if isinstance(last_up, dict):
+                            last_up_str = last_up.get("local") or last_up.get("utc") or "Recent Fix"
+                        else:
+                            last_up_str = str(last_up) if last_up else "Recent Fix"
 
-                    station_info = {
-                        "id": best_loc.get("id"),
-                        "name": best_loc.get("name", "Local Air Monitor"),
-                        "distance_km": dist_km,
-                        "provider": best_loc.get("provider", {}).get("name", "Government Air Network"),
-                        "latitude": station_lat,
-                        "longitude": station_lon,
-                        "last_updated": last_up_str,
-                    }
+                        station_info = {
+                            "id": best_loc.get("id"),
+                            "name": best_loc.get("name", "Local Air Monitor"),
+                            "distance_km": dist_km,
+                            "provider": best_loc.get("provider", {}).get("name", "Government Air Network"),
+                            "latitude": station_lat,
+                            "longitude": station_lon,
+                            "last_updated": last_up_str,
+                        }
 
-                    # Deduplicate sensors for the same pollutant:
-                    # Prefer standard metric units (µg/m³, mg/m³, °C, %) over ppm/ppb
-                    target_params = {"pm25", "pm10", "no2", "o3", "co", "so2", "temperature", "relativehumidity"}
-                    selected_sensors: List[Dict[str, Any]] = []
-                    seen_params = set()
+                        # Deduplicate sensors for the same pollutant:
+                        # Prefer standard metric units (µg/m³, mg/m³, °C, %) over ppm/ppb
+                        target_params = {"pm25", "pm10", "no2", "o3", "co", "so2", "temperature", "relativehumidity"}
+                        selected_sensors: List[Dict[str, Any]] = []
+                        seen_params = set()
 
-                    # Pass 1: Select preferred standard metric unit sensors
-                    for sensor in best_loc.get("sensors", []):
-                        param_obj = sensor.get("parameter", {})
-                        p_name = param_obj.get("name", "").lower()
-                        p_unit = (param_obj.get("units") or "").lower()
-                        if p_name in target_params and p_unit in ["µg/m³", "ug/m3", "mg/m³", "mg/m3", "°c", "%"]:
-                            if p_name not in seen_params:
+                        # Pass 1: Select preferred standard metric unit sensors
+                        for sensor in best_loc.get("sensors", []):
+                            param_obj = sensor.get("parameter", {})
+                            p_name = param_obj.get("name", "").lower()
+                            p_unit = (param_obj.get("units") or "").lower()
+                            if p_name in target_params and p_unit in ["µg/m³", "ug/m3", "mg/m³", "mg/m3", "°c", "%"]:
+                                if p_name not in seen_params:
+                                    selected_sensors.append(sensor)
+                                    seen_params.add(p_name)
+
+                        # Pass 2: Fallback to any remaining target parameter sensors
+                        for sensor in best_loc.get("sensors", []):
+                            param_obj = sensor.get("parameter", {})
+                            p_name = param_obj.get("name", "").lower()
+                            if p_name in target_params and p_name not in seen_params:
                                 selected_sensors.append(sensor)
                                 seen_params.add(p_name)
 
-                    # Pass 2: Fallback to any remaining target parameter sensors
-                    for sensor in best_loc.get("sensors", []):
-                        param_obj = sensor.get("parameter", {})
-                        p_name = param_obj.get("name", "").lower()
-                        if p_name in target_params and p_name not in seen_params:
-                            selected_sensors.append(sensor)
-                            seen_params.add(p_name)
+                        # Parallel sensor fetching via asyncio.gather
+                        async def fetch_single_sensor(s: Dict[str, Any]) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+                            s_id = s.get("id")
+                            p_obj = s.get("parameter", {})
+                            p_name = p_obj.get("name", "").lower()
+                            clean_key = "humidity" if p_name == "relativehumidity" else p_name
+                            try:
+                                m_res = await client.get(
+                                    f"{OPENAQ_BASE_URL}/sensors/{s_id}/hours",
+                                    headers=headers,
+                                    params={"limit": 1},
+                                    timeout=4.0,
+                                )
+                                if m_res.status_code == 200:
+                                    m_data = m_res.json().get("results", [])
+                                    if m_data:
+                                        val = m_data[0].get("value")
+                                        unit = p_obj.get("units", "µg/m³")
+                                        return clean_key, {
+                                            "value": round(float(val), 1) if val is not None else None,
+                                            "unit": unit,
+                                            "label": p_obj.get("displayName") or p_name.upper(),
+                                            "time": m_data[0].get("period", {}).get("datetimeTo", {}).get("local"),
+                                        }
+                            except Exception:
+                                pass
+                            return None, None
 
-                    # Parallel sensor fetching via asyncio.gather
-                    async def fetch_single_sensor(s: Dict[str, Any]) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
-                        s_id = s.get("id")
-                        p_obj = s.get("parameter", {})
-                        p_name = p_obj.get("name", "").lower()
-                        clean_key = "humidity" if p_name == "relativehumidity" else p_name
-                        try:
-                            m_res = await client.get(
-                                f"{OPENAQ_BASE_URL}/sensors/{s_id}/hours",
-                                headers=headers,
-                                params={"limit": 1},
-                                timeout=4.0,
-                            )
-                            if m_res.status_code == 200:
-                                m_data = m_res.json().get("results", [])
-                                if m_data:
-                                    val = m_data[0].get("value")
-                                    unit = p_obj.get("units", "µg/m³")
-                                    return clean_key, {
-                                        "value": round(float(val), 1) if val is not None else None,
-                                        "unit": unit,
-                                        "label": p_obj.get("displayName") or p_name.upper(),
-                                        "time": m_data[0].get("period", {}).get("datetimeTo", {}).get("local"),
-                                    }
-                        except Exception:
-                            pass
-                        return None, None
+                        sensor_tasks = [fetch_single_sensor(s) for s in selected_sensors]
+                        sensor_results = await asyncio.gather(*sensor_tasks)
 
-                    sensor_tasks = [fetch_single_sensor(s) for s in selected_sensors]
-                    sensor_results = await asyncio.gather(*sensor_tasks)
-
-                    for clean_key, detail in sensor_results:
-                        if clean_key and detail and detail.get("value") is not None:
-                            pollutants[clean_key] = detail
-    except Exception as e:
-        print(f"[OpenAQ Service] Error querying API: {e}")
+                        for clean_key, detail in sensor_results:
+                            if clean_key and detail and detail.get("value") is not None:
+                                pollutants[clean_key] = detail
+        except Exception as e:
+            print(f"[OpenAQ Service] Error querying API: {e}")
 
     # Calculate AQI from PM2.5 or fallback
     pm25_val = pollutants.get("pm25", {}).get("value", 75.0)
@@ -227,7 +243,7 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
 
     result = {
         "status": "success",
-        "source": "OpenAQ Global Clean Air Network",
+        "source": source_name,
         "coordinates": {"latitude": lat, "longitude": lon},
         "aqi": aqi_score,
         "dominant_pollutant": "PM2.5 (Fine Particulate Matter)",
