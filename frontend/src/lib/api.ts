@@ -331,12 +331,6 @@ export interface AirQualityStation {
   last_updated?: string;
 }
 
-export interface TrendHistoryItem {
-  hour: string;
-  pm25: number;
-  aqi: number;
-}
-
 export interface AirQualityData {
   status: string;
   source: string;
@@ -351,6 +345,8 @@ export interface AirQualityData {
   mask_needed?: boolean;
   purifier_needed?: boolean;
   dominant_pollutant: string;
+  dominant_pollutant_key?: string;
+  pollutant_aqis?: Record<string, number>;
   pollutants: {
     pm25?: PollutantDetail;
     pm10?: PollutantDetail;
@@ -363,7 +359,6 @@ export interface AirQualityData {
     [key: string]: PollutantDetail | undefined;
   };
   station: AirQualityStation;
-  trend_history: TrendHistoryItem[];
   fetched_at: string;
   fetched_at_display?: string;
   is_cached?: boolean;

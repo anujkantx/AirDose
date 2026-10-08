@@ -33,3 +33,8 @@ HYSTERESIS_BUFFER_METERS: float = 25.0
 
 # Number of consecutive samples outside geofence required to trigger outdoor transition
 HYSTERESIS_SAMPLE_THRESHOLD: int = 2
+
+# OpenAQ API Location Search Constants
+OPENAQ_SEARCH_RADIUS_METERS: int = 25000  # 25 km radius
+OPENAQ_LOCATIONS_LIMIT: int = 10  # Maximum candidate stations to fetch
+

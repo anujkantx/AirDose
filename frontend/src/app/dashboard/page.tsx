@@ -9,7 +9,6 @@ import ExposureContributionCard from "@/components/ExposureContributionCard";
 import ExposureHistoryChart from "@/components/ExposureHistoryChart";
 import AirQualityHero from "@/components/AirQualityHero";
 import PollutantGrid from "@/components/PollutantGrid";
-import AirTrendChart from "@/components/AirTrendChart";
 import StationInfoCard from "@/components/StationInfoCard";
 import CurrentLocationCard from "@/components/CurrentLocationCard";
 import {
@@ -347,14 +346,8 @@ export default function DashboardPage() {
           {/* 4. Real-time Pollutant Matrix (PM2.5, PM10, NO2, O3, CO, SO2) */}
           <PollutantGrid data={airData} loading={refreshing && !airData} />
 
-          {/* 5. Temporal Trend & Monitoring Station Split */}
+          {/* 5. Monitoring Station & Live GPS Telemetry */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2">
-              <AirTrendChart
-                trendHistory={airData?.trend_history || []}
-                currentAqi={airData?.aqi || 100}
-              />
-            </div>
             <div className="lg:col-span-1">
               <StationInfoCard
                 station={airData?.station}
@@ -362,16 +355,14 @@ export default function DashboardPage() {
                 humidity={airData?.pollutants?.humidity}
               />
             </div>
-          </div>
-
-          {/* 6. Live GPS Telemetry Card */}
-          <div>
-            <CurrentLocationCard
-              userId={user?.id}
-              onLocationSaved={() => {
-                sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true);
-              }}
-            />
+            <div className="lg:col-span-2">
+              <CurrentLocationCard
+                userId={user?.id}
+                onLocationSaved={() => {
+                  sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true);
+                }}
+              />
+            </div>
           </div>
         </main>
 
