@@ -37,7 +37,6 @@ from app.services.daily_exposure_service import (
 from app.services.air_quality_service import (
     AirQualityService,
     air_quality_service,
-    insert_air_quality_sample,
 )
 
 __all__ = [
@@ -66,5 +65,4 @@ __all__ = [
     "get_location_contributions",
     "AirQualityService",
     "air_quality_service",
-    "insert_air_quality_sample",
 ]

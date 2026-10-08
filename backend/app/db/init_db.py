@@ -107,19 +107,6 @@ def init_db():
             )
         """)
 
-        # 6. Air quality observations table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS air_quality_samples (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                latitude REAL NOT NULL,
-                longitude REAL NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                pm25 REAL NOT NULL,
-                source TEXT,
-                confidence TEXT DEFAULT 'medium'
-            )
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_aq_samples_coords ON air_quality_samples(latitude, longitude, timestamp)")
 
         # Check demo user
         cursor.execute("SELECT id FROM users WHERE email = ?", ("demo@example.com",))
