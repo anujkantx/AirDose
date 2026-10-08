@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
-from app.constants import (
+from app.core.constants import (
     BASE_BREATHING_RATE_M3_S,
     DEFAULT_BREATHING_FACTOR,
     DEFAULT_INDOOR_FACTOR,

@@ -6,7 +6,7 @@ and boundary hysteresis / debouncing to prevent flapping on noisy GPS data.
 
 import math
 from typing import Dict, Any, Optional, List, Tuple
-from app.constants import (
+from app.core.constants import (
     DEFAULT_INDOOR_FACTOR,
     OUTDOOR_FACTOR,
     DEFAULT_PLACE_RADIUS_METERS,

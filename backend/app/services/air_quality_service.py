@@ -6,7 +6,7 @@ caching, and movement/time-based refresh logic (1 km / 30 minutes).
 import time
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
-from app.constants import (
+from app.core.constants import (
     POLLUTION_REFRESH_DISTANCE_M,
     POLLUTION_REFRESH_INTERVAL_SECONDS,
 )
