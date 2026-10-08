@@ -1,20 +1,40 @@
-"""Air Quality Telemetry router integrating with OpenAQ API."""
+from fastapi import APIRouter, HTTPException, Query, status
 
-from fastapi import APIRouter, HTTPException, status, Query
-from app.openaq_service import fetch_openaq_air_quality
+from app.services.air_quality_service import air_quality_service
 
-router = APIRouter(prefix="/api/air-quality", tags=["Air Quality Telemetry"])
+
+router = APIRouter(
+    prefix="/api/air-quality",
+    tags=["Air Quality Telemetry"],
+)
 
 
 @router.get("")
 async def get_air_quality(
-    lat: float = Query(28.6139, description="Latitude coordinate"),
-    lon: float = Query(77.2090, description="Longitude coordinate"),
+    lat: float = Query(
+        ...,
+        ge=-90.0,
+        le=90.0,
+        description="Latitude coordinate (mandatory)",
+    ),
+    lon: float = Query(
+        ...,
+        ge=-180.0,
+        le=180.0,
+        description="Longitude coordinate (mandatory)",
+    ),
+    force_refresh: bool = Query(
+        False,
+        description="Bypass spatio-temporal cache",
+    ),
 ):
-    """Fetches real-time air quality metrics, pollutants, and AQI from OpenAQ."""
     try:
-        data = await fetch_openaq_air_quality(lat=lat, lon=lon)
-        return data
+        return await air_quality_service.get_air_quality_telemetry(
+            lat=lat,
+            lon=lon,
+            force_refresh=force_refresh,
+        )
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

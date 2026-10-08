@@ -1,12 +1,16 @@
 """OpenAQ Air Quality Service.
 Fetches real-time air quality metrics, pollutants (PM2.5, PM10, NO2, O3, CO, SO2),
 and computes AQI, health recommendations, and sensor station metadata.
+Includes spatio-temporal caching:
+- Cache validity: 30 minutes (1800 seconds)
+- Spatial range: 1.0 km (1000 meters)
 """
 
 import os
 import math
 import time
 from typing import Dict, Any, Optional, List
+from datetime import datetime, timezone
 import httpx
 from dotenv import load_dotenv
 
@@ -15,15 +19,17 @@ load_dotenv()
 OPENAQ_API_KEY = os.getenv("OPENAQ_API_KEY", "")
 OPENAQ_BASE_URL = "https://api.openaq.org/v3"
 
-# In-memory cache to prevent excessive API calls
-# Key: "round_lat_round_lon", Value: (timestamp, data)
-_CACHE: Dict[str, Any] = {}
-CACHE_TTL_SECONDS = 300  # 5 minutes
+# Spatio-Temporal Cache Configuration
+CACHE_TTL_SECONDS = 1800  # 30 minutes
+CACHE_DISTANCE_METERS = 1000.0  # 1.0 km
+
+# List of cached observations: [ { "latitude": float, "longitude": float, "timestamp": float, "iso": str, "data": dict } ]
+_SPATIO_TEMPORAL_CACHE: List[Dict[str, Any]] = []
 
 
-def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculates distance between two coordinates in kilometers."""
-    R = 6371.0  # Earth radius in km
+def haversine_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculates distance between two coordinates in meters."""
+    R = 6371000.0  # Earth radius in meters
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
     a = (
@@ -129,16 +135,34 @@ def get_aqi_category(aqi: int) -> Dict[str, str]:
         }
 
 
-async def fetch_openaq_air_quality(lat: float, lon: float) -> Dict[str, Any]:
-    """Fetches real air quality data from OpenAQ for given coordinates."""
-    cache_key = f"{round(lat, 2)}_{round(lon, 2)}"
+async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool = False) -> Dict[str, Any]:
+    """Fetches real air quality data from OpenAQ for given coordinates.
+    Spatio-Temporal Caching Rule:
+    - If user is within 1.0 km of a cached point AND cache age < 30 minutes (1800s), return saved cache.
+    - Otherwise, query OpenAQ API and update cache.
+    """
     now = time.time()
 
-    if cache_key in _CACHE:
-        cached_time, cached_data = _CACHE[cache_key]
-        if now - cached_time < CACHE_TTL_SECONDS:
-            return cached_data
+    # 1. Spatio-temporal cache evaluation
+    if not force_refresh:
+        for entry in reversed(_SPATIO_TEMPORAL_CACHE):
+            age_seconds = now - entry["timestamp"]
+            if age_seconds < CACHE_TTL_SECONDS:
+                dist_meters = haversine_distance_meters(lat, lon, entry["latitude"], entry["longitude"])
+                if dist_meters <= CACHE_DISTANCE_METERS:
+                    # Cache hit within 1km and 30 minutes!
+                    cached_data = dict(entry["data"])
+                    cached_data["is_cached"] = True
+                    cached_data["cache_age_seconds"] = int(age_seconds)
+                    cached_data["cache_expires_in_seconds"] = max(0, int(CACHE_TTL_SECONDS - age_seconds))
+                    cached_data["cache_distance_meters"] = round(dist_meters, 1)
+                    cached_data["cache_anchor_lat"] = entry["latitude"]
+                    cached_data["cache_anchor_lon"] = entry["longitude"]
+                    cached_data["cached_at"] = entry["iso"]
+                    cached_data["cached_at_display"] = entry.get("display_time", "")
+                    return cached_data
 
+    # 2. Fresh OpenAQ fetch required
     headers = {"X-API-Key": OPENAQ_API_KEY} if OPENAQ_API_KEY else {}
 
     pollutants: Dict[str, Any] = {
@@ -164,7 +188,7 @@ async def fetch_openaq_air_quality(lat: float, lon: float) -> Dict[str, Any]:
 
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
-            # 1. Query nearest locations within 25km radius
+            # Query nearest locations within 25km radius
             res = await client.get(
                 f"{OPENAQ_BASE_URL}/locations",
                 headers=headers,
@@ -174,31 +198,28 @@ async def fetch_openaq_air_quality(lat: float, lon: float) -> Dict[str, Any]:
                 loc_data = res.json()
                 results = loc_data.get("results", [])
                 
-                # Pick the location with sensors and most recent data
                 best_loc = None
                 for loc in results:
                     if loc.get("sensors"):
                         best_loc = loc
-                        # Prioritize active station with recent datetime
                         if loc.get("datetimeLast"):
                             break
 
                 if best_loc:
                     station_lat = best_loc.get("coordinates", {}).get("latitude", lat)
                     station_lon = best_loc.get("coordinates", {}).get("longitude", lon)
-                    dist = haversine_distance(lat, lon, station_lat, station_lon)
+                    dist_km = haversine_distance_meters(lat, lon, station_lat, station_lon) / 1000.0
 
                     station_info = {
                         "id": best_loc.get("id"),
                         "name": best_loc.get("name", "Local Air Monitor"),
-                        "distance_km": round(dist, 1),
+                        "distance_km": round(dist_km, 1),
                         "provider": best_loc.get("provider", {}).get("name", "Government Air Network"),
                         "latitude": station_lat,
                         "longitude": station_lon,
                         "last_updated": best_loc.get("datetimeLast", {}).get("local", "Recent Fix"),
                     }
 
-                    # Extract sensor measurements
                     for sensor in best_loc.get("sensors", []):
                         param_obj = sensor.get("parameter", {})
                         param_name = param_obj.get("name", "").lower()
@@ -234,7 +255,7 @@ async def fetch_openaq_air_quality(lat: float, lon: float) -> Dict[str, Any]:
     aqi_score = calculate_pm25_aqi(pm25_val)
     category_info = get_aqi_category(aqi_score)
 
-    # 24-hour trend generation for minimal chart
+    # 24-hour trend generation
     trend_history: List[Dict[str, Any]] = []
     base_val = pm25_val if pm25_val else 80
     for hour in range(12, 0, -1):
@@ -251,6 +272,9 @@ async def fetch_openaq_air_quality(lat: float, lon: float) -> Dict[str, Any]:
         "pm25": round(base_val, 1),
         "aqi": aqi_score,
     })
+
+    current_iso = datetime.now(timezone.utc).isoformat()
+    display_time = datetime.now().strftime("%I:%M %p")
 
     result = {
         "status": "success",
@@ -269,8 +293,29 @@ async def fetch_openaq_air_quality(lat: float, lon: float) -> Dict[str, Any]:
         "pollutants": pollutants,
         "station": station_info,
         "trend_history": trend_history,
-        "fetched_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "fetched_at": current_iso,
+        "fetched_at_display": display_time,
+        "is_cached": False,
+        "cache_age_seconds": 0,
+        "cache_expires_in_seconds": CACHE_TTL_SECONDS,
+        "cache_distance_meters": 0.0,
+        "cache_anchor_lat": lat,
+        "cache_anchor_lon": lon,
+        "cached_at": current_iso,
+        "cached_at_display": display_time,
     }
 
-    _CACHE[cache_key] = (now, result)
+    # Append to spatio-temporal cache (keep last 50 points in memory)
+    _SPATIO_TEMPORAL_CACHE.append({
+        "latitude": lat,
+        "longitude": lon,
+        "timestamp": now,
+        "iso": current_iso,
+        "display_time": display_time,
+        "data": result,
+    })
+    if len(_SPATIO_TEMPORAL_CACHE) > 50:
+        _SPATIO_TEMPORAL_CACHE.pop(0)
+
     return result
+
