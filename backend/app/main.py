@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import auth, locations, air_quality, dashboard
+from app.routers import auth, locations, air_quality, exposure
 
 
 @asynccontextmanager
@@ -37,7 +37,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(locations.router)
 app.include_router(air_quality.router)
-app.include_router(dashboard.router)
+app.include_router(exposure.router)
 
 
 @app.get("/health", tags=["Health"])
