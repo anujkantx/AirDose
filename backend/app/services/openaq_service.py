@@ -1,9 +1,6 @@
-"""OpenAQ Air Quality Service.
-Fetches real-time air quality metrics, pollutants (PM2.5, PM10, NO2, O3, CO, SO2),
-and computes AQI, health recommendations, and sensor station metadata.
-Includes spatio-temporal caching:
-- Cache validity: 30 minutes (1800 seconds)
-- Spatial range: 1.0 km (1000 meters)
+"""OpenAQ Air Quality Integration Service.
+Fetches real-time air quality metrics and pollutants (PM2.5, PM10, NO2, O3, CO, SO2)
+from the OpenAQ v3 API with spatio-temporal caching (1.0 km / 30 minutes).
 """
 
 import os
@@ -13,6 +10,9 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 import httpx
 from dotenv import load_dotenv
+
+from app.core.aqi import calculate_pm25_aqi, get_aqi_category
+from app.services.location_service import haversine_distance
 
 # Load environment variables
 load_dotenv()
@@ -25,114 +25,6 @@ CACHE_DISTANCE_METERS = 1000.0  # 1.0 km
 
 # List of cached observations: [ { "latitude": float, "longitude": float, "timestamp": float, "iso": str, "data": dict } ]
 _SPATIO_TEMPORAL_CACHE: List[Dict[str, Any]] = []
-
-
-def haversine_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculates distance between two coordinates in meters."""
-    R = 6371000.0  # Earth radius in meters
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (
-        math.sin(dlat / 2) ** 2
-        + math.cos(math.radians(lat1))
-        * math.cos(math.radians(lat2))
-        * math.sin(dlon / 2) ** 2
-    )
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
-
-
-def calculate_pm25_aqi(pm25: float) -> int:
-    """Calculates AQI from PM2.5 concentration in ug/m3 using US EPA standard."""
-    if pm25 is None or pm25 < 0:
-        return 50
-    c = pm25
-    if c <= 12.0:
-        return int(((50 - 0) / (12.0 - 0.0)) * (c - 0.0) + 0)
-    elif c <= 35.4:
-        return int(((100 - 51) / (35.4 - 12.1)) * (c - 12.1) + 51)
-    elif c <= 55.4:
-        return int(((150 - 101) / (55.4 - 35.5)) * (c - 35.5) + 101)
-    elif c <= 150.4:
-        return int(((200 - 151) / (150.4 - 55.5)) * (c - 55.5) + 151)
-    elif c <= 250.4:
-        return int(((300 - 201) / (250.4 - 150.5)) * (c - 150.5) + 201)
-    elif c <= 350.4:
-        return int(((400 - 301) / (350.4 - 250.5)) * (c - 250.5) + 301)
-    elif c <= 500.4:
-        return int(((500 - 401) / (500.4 - 350.5)) * (c - 350.5) + 401)
-    else:
-        return 500
-
-
-def get_aqi_category(aqi: int) -> Dict[str, str]:
-    """Returns classification, color, and health advice for an AQI value."""
-    if aqi <= 50:
-        return {
-            "level": "Good",
-            "category": "Good",
-            "color": "#10b981",  # Emerald Green
-            "badgeClass": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-            "description": "Air quality is satisfactory, and air pollution poses little or no risk.",
-            "recommendation": "Ideal air quality for outdoor workouts, cycling, and opening windows.",
-            "mask_needed": False,
-            "purifier_needed": False,
-        }
-    elif aqi <= 100:
-        return {
-            "level": "Moderate",
-            "category": "Moderate",
-            "color": "#eab308",  # Yellow
-            "badgeClass": "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-            "description": "Air quality is acceptable. However, sensitive individuals may experience minor symptoms.",
-            "recommendation": "Unusually sensitive people should consider reducing prolonged outdoor exertion.",
-            "mask_needed": False,
-            "purifier_needed": False,
-        }
-    elif aqi <= 150:
-        return {
-            "level": "Unhealthy for Sensitive Groups",
-            "category": "Unhealthy for Sensitive Groups",
-            "color": "#f97316",  # Orange
-            "badgeClass": "bg-orange-500/10 text-orange-400 border-orange-500/20",
-            "description": "Members of sensitive groups may experience health effects. The general public is less likely affected.",
-            "recommendation": "Children, the elderly, and people with respiratory or heart conditions should limit outdoor activity.",
-            "mask_needed": True,
-            "purifier_needed": True,
-        }
-    elif aqi <= 200:
-        return {
-            "level": "Unhealthy",
-            "category": "Unhealthy",
-            "color": "#ef4444",  # Red
-            "badgeClass": "bg-rose-500/10 text-rose-400 border-rose-500/20",
-            "description": "Everyone may begin to experience health effects; sensitive groups may experience more serious effects.",
-            "recommendation": "Wear an N95 mask outdoors. Keep windows closed and run an air purifier indoors.",
-            "mask_needed": True,
-            "purifier_needed": True,
-        }
-    elif aqi <= 300:
-        return {
-            "level": "Very Unhealthy",
-            "category": "Very Unhealthy",
-            "color": "#a855f7",  # Purple
-            "badgeClass": "bg-purple-500/10 text-purple-400 border-purple-500/20",
-            "description": "Health alert: The risk of health effects is increased for everyone.",
-            "recommendation": "Avoid outdoor strenuous activities. Keep indoor air clean with HEPA filtration.",
-            "mask_needed": True,
-            "purifier_needed": True,
-        }
-    else:
-        return {
-            "level": "Hazardous",
-            "category": "Hazardous",
-            "color": "#7f1d1d",  # Deep Maroon
-            "badgeClass": "bg-red-950/40 text-red-400 border-red-800/40",
-            "description": "Health warning of emergency conditions: Everyone is more likely to be affected.",
-            "recommendation": "Remain indoors. Avoid all physical outdoor activities and seal entryways.",
-            "mask_needed": True,
-            "purifier_needed": True,
-        }
 
 
 async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool = False) -> Dict[str, Any]:
@@ -148,7 +40,7 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
         for entry in reversed(_SPATIO_TEMPORAL_CACHE):
             age_seconds = now - entry["timestamp"]
             if age_seconds < CACHE_TTL_SECONDS:
-                dist_meters = haversine_distance_meters(lat, lon, entry["latitude"], entry["longitude"])
+                dist_meters = haversine_distance(lat, lon, entry["latitude"], entry["longitude"])
                 if dist_meters <= CACHE_DISTANCE_METERS:
                     # Cache hit within 1km and 30 minutes!
                     cached_data = dict(entry["data"])
@@ -208,7 +100,7 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
                 if best_loc:
                     station_lat = best_loc.get("coordinates", {}).get("latitude", lat)
                     station_lon = best_loc.get("coordinates", {}).get("longitude", lon)
-                    dist_km = haversine_distance_meters(lat, lon, station_lat, station_lon) / 1000.0
+                    dist_km = haversine_distance(lat, lon, station_lat, station_lon) / 1000.0
 
                     station_info = {
                         "id": best_loc.get("id"),
@@ -231,6 +123,7 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
                                     f"{OPENAQ_BASE_URL}/sensors/{sensor_id}/hours",
                                     headers=headers,
                                     params={"limit": 1},
+                                    timeout=4.0,
                                 )
                                 if m_res.status_code == 200:
                                     m_data = m_res.json().get("results", [])
@@ -318,4 +211,3 @@ async def fetch_openaq_air_quality(lat: float, lon: float, force_refresh: bool =
         _SPATIO_TEMPORAL_CACHE.pop(0)
 
     return result
-

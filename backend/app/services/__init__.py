@@ -34,6 +34,7 @@ from app.services.daily_exposure_service import (
     get_daily_exposure_history,
     get_location_contributions,
 )
+from app.services.openaq_service import fetch_openaq_air_quality
 from app.services.air_quality_service import (
     AirQualityService,
     air_quality_service,
@@ -64,6 +65,7 @@ __all__ = [
     "upsert_daily_exposure",
     "get_daily_exposure_history",
     "get_location_contributions",
+    "fetch_openaq_air_quality",
     "AirQualityService",
     "air_quality_service",
     "insert_air_quality_sample",

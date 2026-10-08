@@ -1,6 +1,7 @@
 """Core scientific calculation engines, physical models, and domain constants."""
 
 from app.core.infiltration import calculate_infiltration_factor
+from app.core.aqi import calculate_pm25_aqi, get_aqi_category
 from app.core.constants import (
     BASE_BREATHING_RATE_M3_S,
     DEFAULT_BREATHING_FACTOR,
@@ -18,6 +19,8 @@ from app.core.constants import (
 
 __all__ = [
     "calculate_infiltration_factor",
+    "calculate_pm25_aqi",
+    "get_aqi_category",
     "BASE_BREATHING_RATE_M3_S",
     "DEFAULT_BREATHING_FACTOR",
     "DEFAULT_INDOOR_FACTOR",
