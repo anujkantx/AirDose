@@ -11,8 +11,7 @@ from datetime import datetime, timezone
 import httpx
 from dotenv import load_dotenv
 
-from app.core.aqi import calculate_pm25_aqi
-from app.services.location_service import haversine_distance
+from app.core import calculate_pm25_aqi, haversine_distance
 
 # Load environment variables
 load_dotenv()

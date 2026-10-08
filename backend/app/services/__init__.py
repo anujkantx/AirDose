@@ -17,7 +17,6 @@ from app.services.location_service import (
     get_user_location_by_id,
     update_user_location,
     delete_user_location,
-    haversine_distance,
 )
 from app.services.exposure_service import (
     ExposureService,
@@ -51,7 +50,6 @@ __all__ = [
     "get_user_location_by_id",
     "update_user_location",
     "delete_user_location",
-    "haversine_distance",
     "ExposureService",
     "exposure_service",
     "insert_exposure_segment",

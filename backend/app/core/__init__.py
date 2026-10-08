@@ -2,6 +2,7 @@
 
 from app.core.infiltration import calculate_infiltration_factor
 from app.core.aqi import calculate_pm25_aqi
+from app.core.haversine import haversine_distance
 from app.core.constants import (
     BASE_BREATHING_RATE_M3_S,
     DEFAULT_BREATHING_FACTOR,
@@ -20,6 +21,7 @@ from app.core.constants import (
 __all__ = [
     "calculate_infiltration_factor",
     "calculate_pm25_aqi",
+    "haversine_distance",
     "BASE_BREATHING_RATE_M3_S",
     "DEFAULT_BREATHING_FACTOR",
     "DEFAULT_INDOOR_FACTOR",
