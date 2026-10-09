@@ -5,6 +5,29 @@
 
 ---
 
+## 📚 Technical Documentation & Specifications
+
+For comprehensive guides and team architecture reference:
+
+- **[System Architecture](docs/ARCHITECTURE.md)**: Request flow, folder responsibilities, and key design decisions.
+- **[API Specification](docs/API.md)**: REST endpoints, request/response payloads, and authentication headers.
+- **[Dosimeter Exposure Model](docs/EXPOSURE_MODEL.md)**: Core inhalation formulas, units, and physiological coefficients.
+- **[Team Workflow & Collaboration](docs/TEAM_WORKFLOW.md)**: Branching strategy, feature ownership, and pre-commit checks.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | Next.js 15+ (App Router), TypeScript, Tailwind CSS, Lucide Icons |
+| **Backend** | Python 3.11+, FastAPI, Pydantic v2, Uvicorn |
+| **Data & Storage** | SQLite3 (Zero-config local database), In-Memory Spatio-Temporal Cache |
+| **Integrations** | OpenAQ v3 API (Global ground air quality monitoring stations) |
+| **Sensor Telemetry** | W3C Geolocation API, Haversine displacement speed, Device Motion accelerometer |
+
+---
+
 ## 🎯 Complete Beginner's Guide: Clone to Contribution
 
 This guide covers **every single step and command** you need to clone the repository, run the project locally on your computer, make changes, and push them to GitHub.

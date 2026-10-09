@@ -9,8 +9,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 import httpx
-from dotenv import load_dotenv
-
+from app.core.config import settings
 from app.core.constants import (
     OPENAQ_BASE_URL,
     OPENAQ_SEARCH_RADIUS_METERS,
@@ -19,22 +18,20 @@ from app.core.constants import (
     OPENAQ_SENSOR_TIMEOUT_SECONDS,
 )
 
-load_dotenv()
-
 
 class OpenAQClient:
     """Async HTTP Client for OpenAQ v3 API."""
 
     def __init__(self, api_key: Optional[str] = None, base_url: str = OPENAQ_BASE_URL):
-        self._api_key = (api_key if api_key is not None else os.getenv("OPENAQ_API_KEY", "")).strip()
+        self._api_key = (api_key if api_key is not None else settings.OPENAQ_API_KEY).strip()
         self._base_url = base_url.rstrip("/")
 
     @property
     def has_api_key(self) -> bool:
-        return bool(self._api_key or os.getenv("OPENAQ_API_KEY", "").strip())
+        return bool(self._api_key or settings.OPENAQ_API_KEY)
 
     def get_headers(self) -> Dict[str, str]:
-        key = (os.getenv("OPENAQ_API_KEY") or self._api_key).strip()
+        key = (settings.OPENAQ_API_KEY or self._api_key).strip()
         return {"X-API-Key": key} if key else {}
 
     async def fetch_candidate_locations(

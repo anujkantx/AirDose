@@ -1,10 +1,10 @@
 """Database connection and session management for AirDose."""
 
 import sqlite3
-import os
 from contextlib import contextmanager
+from app.core.config import settings
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "airdose.db")
+DB_PATH = settings.DB_PATH
 
 
 @contextmanager
