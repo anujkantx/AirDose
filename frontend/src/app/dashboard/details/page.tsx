@@ -455,7 +455,8 @@ export default function ExposureDetailsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <div className="p-3 bg-white rounded-xl border border-amber-200/80 font-mono text-[11px] space-y-1">
                   <span className="font-bold text-emerald-700 flex items-center gap-1">
-                    ✓ Cache Hit (No External API Call)
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Cache Hit (No External API Call)
                   </span>
                   <p className="text-slate-600 font-sans text-xs">
                     If distance &le; 1.0 km AND time elapsed &lt; 30 minutes, cached pollutant matrix &amp; AQI are served immediately with accurate remaining TTL.

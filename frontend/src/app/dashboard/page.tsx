@@ -37,6 +37,8 @@ export default function DashboardPage() {
   const [exposureData, setExposureData] = useState<TodayExposureData | null>(null);
   const [isTracking, setIsTracking] = useState<boolean>(true);
   const [breathingFactor, setBreathingFactor] = useState<number>(1.0);
+  const [isAutoMode, setIsAutoMode] = useState<boolean>(true);
+  const [autoDetectedLabel, setAutoDetectedLabel] = useState<string>("Rest");
   const [permissionDenied, setPermissionDenied] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -47,6 +49,8 @@ export default function DashboardPage() {
   });
 
   const lastCheckpointRef = useRef<{ lat: number; lon: number; time: number } | null>(null);
+  const lastCoordsRef = useRef<{ lat: number; lon: number; timestamp: number } | null>(null);
+  const lastSpeedRef = useRef<number>(0);
   const watchIdRef = useRef<number | null>(null);
 
   // Load exposure data on mount without resetting on refresh
@@ -62,9 +66,81 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Classify physical activity mode based on real-time speed
+  const detectAutoActivity = useCallback((speedMps?: number | null): { factor: number; label: string } => {
+    if (speedMps === null || speedMps === undefined || isNaN(speedMps) || speedMps < 0.5) {
+      return { factor: 1.0, label: "Rest" };
+    }
+    // High speed (> 6.0 m/s or > 21.6 km/h) -> In Vehicle / Transit
+    if (speedMps > 6.0) {
+      return { factor: 1.1, label: "Transit" };
+    }
+    // Moderate-high speed (2.5 to 6.0 m/s, ~9 to 21.6 km/h) -> Running / Jogging
+    if (speedMps > 2.5) {
+      return { factor: 3.5, label: "Running" };
+    }
+    // Moderate speed (0.5 to 2.5 m/s, ~1.8 to 9 km/h) -> Walking
+    return { factor: 1.8, label: "Walking" };
+  }, []);
+
+  // Compute speed from hardware GPS or fallback displacement (meters / second)
+  const calculateMotionSpeed = useCallback(
+    (
+      coords: { latitude: number; longitude: number; speed?: number | null },
+      timestamp: number = Date.now()
+    ): number => {
+      let speed = coords.speed;
+
+      // If browser provides a valid positive speed, use it directly
+      if (speed !== null && speed !== undefined && !isNaN(speed) && speed > 0) {
+        lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+        lastSpeedRef.current = speed;
+        return speed;
+      }
+
+      // Fallback: calculate displacement speed from Haversine distance
+      if (lastCoordsRef.current) {
+        const distKm = calculateHaversineDistance(
+          coords.latitude,
+          coords.longitude,
+          lastCoordsRef.current.lat,
+          lastCoordsRef.current.lon
+        );
+        const timeDeltaSec = (timestamp - lastCoordsRef.current.timestamp) / 1000;
+
+        if (timeDeltaSec >= 1) {
+          const distMeters = distKm * 1000;
+          // Filter minor GPS drift/jitter (< 2 meters)
+          if (distMeters >= 2.0) {
+            speed = distMeters / timeDeltaSec;
+          } else {
+            speed = 0;
+          }
+          lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+          lastSpeedRef.current = speed;
+          return speed;
+        }
+        return lastSpeedRef.current;
+      }
+
+      lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+      lastSpeedRef.current = 0;
+      return 0;
+    },
+    []
+  );
+
   // Send a location tick to backend exposure engine (checkpointed)
   const sendExposureTick = useCallback(
-    async (lat: number, lon: number, accuracy?: number, speed?: number, heading?: number, force: boolean = false) => {
+    async (
+      lat: number,
+      lon: number,
+      accuracy?: number,
+      speed?: number,
+      heading?: number,
+      force: boolean = false,
+      customBreathingFactor?: number
+    ) => {
       const now = Date.now();
       const last = lastCheckpointRef.current;
 
@@ -79,13 +155,14 @@ export default function DashboardPage() {
 
       try {
         lastCheckpointRef.current = { lat, lon, time: now };
+        const factorToUse = customBreathingFactor ?? breathingFactor;
         const res = await trackLocationTick({
           latitude: lat,
           longitude: lon,
           accuracy: accuracy ?? null,
           speed: speed ?? null,
           heading: heading ?? null,
-          breathing_factor: breathingFactor,
+          breathing_factor: factorToUse,
           client_timestamp: now / 1000,
         });
 
@@ -185,13 +262,27 @@ export default function DashboardPage() {
         (pos) => {
           const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
           setUserCoords(coords);
+
+          const motionSpeed = calculateMotionSpeed(pos.coords, Date.now());
+
+          let currentBf = breathingFactor;
+          if (isAutoMode) {
+            const detected = detectAutoActivity(motionSpeed);
+            setAutoDetectedLabel(detected.label);
+            if (Math.abs(detected.factor - breathingFactor) > 0.05) {
+              setBreathingFactor(detected.factor);
+              currentBf = detected.factor;
+            }
+          }
+
           sendExposureTick(
             coords.lat,
             coords.lon,
             pos.coords.accuracy,
-            pos.coords.speed || undefined,
+            motionSpeed || undefined,
             pos.coords.heading || undefined,
-            false
+            false,
+            currentBf
           );
         },
         (err) => {
@@ -210,7 +301,51 @@ export default function DashboardPage() {
         watchIdRef.current = null;
       }
     };
-  }, [isTracking, sendExposureTick]);
+  }, [isTracking, sendExposureTick, isAutoMode, breathingFactor, detectAutoActivity, calculateMotionSpeed]);
+
+  // Physical motion detection for mobile devices (when GPS is stationary/indoors)
+  useEffect(() => {
+    if (!isAutoMode) return;
+
+    let motionCount = 0;
+    let totalMagnitude = 0;
+
+    const handleMotion = (event: DeviceMotionEvent) => {
+      const acc = event.acceleration;
+      if (acc && acc.x !== null && acc.y !== null && acc.z !== null) {
+        const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+        totalMagnitude += mag;
+        motionCount++;
+
+        // Process batch every ~15 samples
+        if (motionCount >= 15) {
+          const avgMag = totalMagnitude / motionCount;
+          motionCount = 0;
+          totalMagnitude = 0;
+
+          // If GPS reports stationary (< 0.5 m/s), check accelerometer
+          if (lastSpeedRef.current < 0.5) {
+            if (avgMag > 4.5) {
+              setAutoDetectedLabel("Running");
+              setBreathingFactor(3.5);
+            } else if (avgMag > 1.2) {
+              setAutoDetectedLabel("Walking");
+              setBreathingFactor(1.8);
+            }
+          }
+        }
+      }
+    };
+
+    if (typeof window !== "undefined" && "DeviceMotionEvent" in window) {
+      window.addEventListener("devicemotion", handleMotion);
+    }
+    return () => {
+      if (typeof window !== "undefined" && "DeviceMotionEvent" in window) {
+        window.removeEventListener("devicemotion", handleMotion);
+      }
+    };
+  }, [isAutoMode]);
 
   const loadAirQuality = async (lat?: number, lon?: number, forceRefresh: boolean = false) => {
     const targetLat = lat ?? userCoords.lat;
@@ -244,10 +379,40 @@ export default function DashboardPage() {
     }
   };
 
+  const handleAutoModeChange = (auto: boolean, cycleSimulated?: boolean) => {
+    setIsAutoMode(auto);
+    if (auto) {
+      if (cycleSimulated) {
+        // Allows testing auto-switching cycle on desktop/laptops without physical displacement
+        const cycleOrder: Array<{ label: string; factor: number }> = [
+          { label: "Rest", factor: 1.0 },
+          { label: "Walking", factor: 1.8 },
+          { label: "Running", factor: 3.5 },
+          { label: "Transit", factor: 1.1 },
+        ];
+        const currentIndex = cycleOrder.findIndex((m) => m.label === autoDetectedLabel);
+        const nextState = cycleOrder[(currentIndex + 1) % cycleOrder.length];
+        setAutoDetectedLabel(nextState.label);
+        setBreathingFactor(nextState.factor);
+        if (isTracking) {
+          sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true, nextState.factor);
+        }
+      } else {
+        const detected = detectAutoActivity(lastSpeedRef.current);
+        setAutoDetectedLabel(detected.label);
+        setBreathingFactor(detected.factor);
+        if (isTracking) {
+          sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true, detected.factor);
+        }
+      }
+    }
+  };
+
   const handleBreathingFactorChange = (newFactor: number) => {
+    setIsAutoMode(false);
     setBreathingFactor(newFactor);
     if (isTracking) {
-      sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true);
+      sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true, newFactor);
     }
   };
 
@@ -329,6 +494,9 @@ export default function DashboardPage() {
             onToggleTracking={handleToggleTracking}
             selectedBreathingFactor={breathingFactor}
             onBreathingFactorChange={handleBreathingFactorChange}
+            isAutoMode={isAutoMode}
+            onAutoModeChange={handleAutoModeChange}
+            autoDetectedLabel={autoDetectedLabel}
             permissionDenied={permissionDenied}
           />
 
