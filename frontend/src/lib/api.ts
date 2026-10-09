@@ -3,6 +3,22 @@
  * Connects to SQLite FastAPI backend on http://localhost:8000
  */
 
+import type {
+  User,
+  AuthResponse,
+  LocationQuestionnaire,
+  UserLocation,
+  UserLocationInput,
+  TodayExposureData,
+  TripSimulationResponse,
+  ExposureHistoryResponse,
+  TrackLocationPayload,
+  AirQualityData,
+} from "@/types";
+
+// Re-export all domain types for backward compatibility across existing imports
+export type * from "@/types";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 function getAuthHeaders(): Record<string, string> {
@@ -16,20 +32,6 @@ function getAuthHeaders(): Record<string, string> {
     }
   }
   return headers;
-}
-
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-  created_at?: string;
-}
-
-export interface AuthResponse {
-  success: boolean;
-  message: string;
-  token: string;
-  user: User;
 }
 
 export async function checkBackendHealth(): Promise<{ status: string; database: string }> {
@@ -62,14 +64,6 @@ export async function signInApi(email: string, password: string): Promise<AuthRe
     throw new Error(data.detail || "Sign in failed");
   }
   return data;
-}
-
-export interface LocationQuestionnaire {
-  enclosure?: "fully_enclosed" | "partially_enclosed" | "mostly_open" | "fully_open" | string;
-  window_opening?: "almost_never" | "sometimes" | "frequently" | "usually_open" | string;
-  ventilation_type?: "mechanical_hvac" | "central_ac" | "mixed" | "exhaust_fan" | "natural" | string;
-  ac_usage?: "no_ac" | "recirculation" | "fresh_air_intake" | string;
-  air_purifier?: "no_purifier" | "sometimes" | "most_of_time" | "always" | string;
 }
 
 export function calculateClientInfiltrationFactor(q: LocationQuestionnaire): number {
@@ -115,35 +109,6 @@ export function calculateClientInfiltrationFactor(q: LocationQuestionnaire): num
 
   const total = base + wDelta + vDelta + acDelta - pReduction;
   return Number(Math.max(0.10, Math.min(1.00, total)).toFixed(2));
-}
-
-export interface UserLocation {
-  id: number;
-  user_id: number;
-  location_type: "home" | "office" | "college" | "other" | string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  address?: string;
-  radius_meters: number;
-  indoor_coefficient: number;
-  infiltration_factor?: number;
-  questionnaire?: LocationQuestionnaire | null;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface UserLocationInput {
-  user_id?: number;
-  location_type: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  address?: string;
-  radius_meters?: number;
-  indoor_coefficient?: number;
-  infiltration_factor?: number;
-  questionnaire?: LocationQuestionnaire | null;
 }
 
 export async function fetchUserLocations(userId?: number): Promise<UserLocation[]> {
@@ -199,55 +164,6 @@ export async function deleteUserLocation(locationId: number, userId?: number): P
   }
 }
 
-// Exposure Tracking Interfaces & API Endpoints
-export interface CurrentExposureInfo {
-  pm25: number;
-  environment: string;
-  location_id?: number | null;
-  location_name?: string | null;
-  infiltration_factor: number;
-  breathing_factor: number;
-  base_breathing_rate_m3_s: number;
-  inhalation_rate_ug_s: number;
-  last_pollution_updated_seconds_ago: number;
-  is_cached?: boolean;
-  cache_expires_in_seconds?: number;
-  cache_distance_meters?: number;
-  cached_at?: string;
-  cached_at_display?: string;
-}
-
-export interface TodayExposureData {
-  date: string;
-  total_exposure_ug: number;
-  current: CurrentExposureInfo | null;
-  contributions: Record<string, number>;
-  tracking: boolean;
-  cigarettes_equivalent?: number;
-  who_percentage?: number;
-  who_status?: string;
-  clean_air_shield_saved_ug?: number;
-}
-
-export interface TransitModeSimulation {
-  mode: string;
-  key: string;
-  icon: string;
-  infiltration_factor: number;
-  breathing_factor: number;
-  inhalation_rate_ug_s: number;
-  estimated_dose_ug: number;
-  cigarettes_equivalent: number;
-}
-
-export interface TripSimulationResponse {
-  duration_minutes: number;
-  ambient_pm25: number;
-  options: TransitModeSimulation[];
-  safest_mode: string;
-  max_dose_savings_ug: number;
-}
-
 export async function simulateTripApi(
   durationMinutes: number = 30,
   ambientPm25: number = 80
@@ -266,29 +182,6 @@ export async function simulateTripApi(
   return res.json();
 }
 
-export interface ExposureHistoryPoint {
-  date: string;
-  label: string;
-  exposure_ug: number;
-}
-
-export interface ExposureHistoryResponse {
-  period: string;
-  start_date: string;
-  end_date: string;
-  data: ExposureHistoryPoint[];
-}
-
-export interface TrackLocationPayload {
-  latitude: number;
-  longitude: number;
-  accuracy?: number | null;
-  speed?: number | null;
-  heading?: number | null;
-  breathing_factor?: number;
-  client_timestamp?: number;
-}
-
 export async function fetchTodayExposure(): Promise<TodayExposureData> {
   const res = await fetch(`${API_BASE}/api/exposure/today`, {
     headers: getAuthHeaders(),
@@ -300,7 +193,7 @@ export async function fetchTodayExposure(): Promise<TodayExposureData> {
   return res.json();
 }
 
-export async function fetchCurrentExposureState(): Promise<{ tracking: boolean; state: any }> {
+export async function fetchCurrentExposureState(): Promise<{ tracking: boolean; state: import("@/types").ExposureStateDetail | null }> {
   const res = await fetch(`${API_BASE}/api/exposure/current`, {
     headers: getAuthHeaders(),
     cache: "no-store",
@@ -311,7 +204,7 @@ export async function fetchCurrentExposureState(): Promise<{ tracking: boolean; 
   return res.json();
 }
 
-export async function trackLocationTick(payload: TrackLocationPayload): Promise<any> {
+export async function trackLocationTick(payload: TrackLocationPayload): Promise<import("@/types").ExposureTickResponse> {
   const res = await fetch(`${API_BASE}/api/exposure/track`, {
     method: "POST",
     headers: getAuthHeaders(),
@@ -323,7 +216,7 @@ export async function trackLocationTick(payload: TrackLocationPayload): Promise<
   return res.json();
 }
 
-export async function stopExposureTracking(): Promise<any> {
+export async function stopExposureTracking(): Promise<{ message?: string; stopped?: boolean }> {
   const res = await fetch(`${API_BASE}/api/exposure/stop`, {
     method: "POST",
     headers: getAuthHeaders(),
@@ -351,65 +244,6 @@ export async function fetchExposureHistory(
     throw new Error("Failed to load exposure history");
   }
   return res.json();
-}
-
-// OpenAQ Air Quality Data
-export interface PollutantDetail {
-  value: number | null;
-  unit: string;
-  label: string;
-  status?: string;
-  time?: string;
-}
-
-export interface AirQualityStation {
-  id: number;
-  name: string;
-  distance_km: number;
-  provider: string;
-  latitude: number;
-  longitude: number;
-  last_updated?: string;
-}
-
-export interface AirQualityData {
-  status: string;
-  source: string;
-  coordinates: { latitude: number; longitude: number };
-  aqi: number;
-  category?: string;
-  level?: string;
-  color?: string;
-  badgeClass?: string;
-  description?: string;
-  recommendation?: string;
-  mask_needed?: boolean;
-  purifier_needed?: boolean;
-  dominant_pollutant: string;
-  dominant_pollutant_key?: string;
-  pollutant_aqis?: Record<string, number>;
-  pollutants: {
-    pm25?: PollutantDetail;
-    pm10?: PollutantDetail;
-    no2?: PollutantDetail;
-    o3?: PollutantDetail;
-    co?: PollutantDetail;
-    so2?: PollutantDetail;
-    temperature?: PollutantDetail;
-    humidity?: PollutantDetail;
-    [key: string]: PollutantDetail | undefined;
-  };
-  station: AirQualityStation;
-  fetched_at: string;
-  fetched_at_display?: string;
-  is_cached?: boolean;
-  cache_age_seconds?: number;
-  cache_expires_in_seconds?: number;
-  cache_distance_meters?: number;
-  cache_anchor_lat?: number;
-  cache_anchor_lon?: number;
-  cached_at?: string;
-  cached_at_display?: string;
 }
 
 export async function fetchAirQuality(

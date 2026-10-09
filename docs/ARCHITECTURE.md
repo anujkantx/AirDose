@@ -56,8 +56,12 @@ AirDose is a personal air-pollution exposure dosimeter that calculates inhaled p
 
 | Directory | Responsibility | Invariants / Constraints |
 | :--- | :--- | :--- |
-| `app/` | Next.js App Router pages, metadata, layouts, and route handlers. | Kept clean of heavy stateful algorithms. |
-| `components/` | Visual UI widgets, charts, tables, and modal dialogs. | Reusable, accessible, and emoji-free (Lucide icons). |
+| `app/` | Next.js App Router pages, metadata, layouts, and route composition. | Thin route pages; avoids inline mathematical calculations. |
+| `components/layout/` | Shell navigation (`Navbar`, `Sidebar`, `DashboardNavbar`). | Pure layout controls; no direct domain math. |
+| `components/dashboard/` | Dosimeter hero, contribution breakdown, charts, and commute modal. | Visualizes personal exposure metrics and handles user mode toggles. |
+| `components/air-quality/` | AQI matrix, pollutant telemetry grids, and station cards. | Visualizes sensor observations and EPA health categories. |
+| `components/locations/` | Saved location geofences and indoor infiltration calibration. | Manages user location cards and geofence radars. |
+| `components/ui/` | Generic reusable UI primitives (buttons, dialogs, inputs). | Shared presentation atoms without application coupling. |
 | `lib/` | API communication clients, unit conversion helpers, and distance math. | Framework-agnostic pure TypeScript utilities. |
 | `types/` | Shared TypeScript domain contracts. | Single source of truth for frontend entity definitions. |
 

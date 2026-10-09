@@ -1,358 +1,39 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
-import DashboardNavbar from "@/components/DashboardNavbar";
-import TodayExposureHero from "@/components/TodayExposureHero";
-import ExposureContributionCard from "@/components/ExposureContributionCard";
-import ExposureHistoryChart from "@/components/ExposureHistoryChart";
-import AirQualityHero from "@/components/AirQualityHero";
-import PollutantGrid from "@/components/PollutantGrid";
-import StationInfoCard from "@/components/StationInfoCard";
-import CurrentLocationCard from "@/components/CurrentLocationCard";
-import CleanAirAdvisoryCard from "@/components/CleanAirAdvisoryCard";
+import Sidebar from "@/components/layout/Sidebar";
+import DashboardNavbar from "@/components/layout/DashboardNavbar";
+import TodayExposureHero from "@/components/dashboard/TodayExposureHero";
+import ExposureContributionCard from "@/components/dashboard/ExposureContributionCard";
+import ExposureHistoryChart from "@/components/dashboard/ExposureHistoryChart";
+import AirQualityHero from "@/components/air-quality/AirQualityHero";
+import PollutantGrid from "@/components/air-quality/PollutantGrid";
+import StationInfoCard from "@/components/air-quality/StationInfoCard";
+import CleanAirAdvisoryCard from "@/components/air-quality/CleanAirAdvisoryCard";
+import CurrentLocationCard from "@/components/locations/CurrentLocationCard";
+import { useExposureTracker } from "@/hooks";
 import {
   getStoredUser,
   clearSession,
   fetchAirQuality,
-  fetchTodayExposure,
-  trackLocationTick,
-  stopExposureTracking,
   User,
   AirQualityData,
-  TodayExposureData,
 } from "@/lib/api";
-import { calculateHaversineDistance } from "@/lib/haversine";
-import {
-  RefreshCw,
-  Radio,
-  MapPin,
-} from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [airData, setAirData] = useState<AirQualityData | null>(null);
-  const [exposureData, setExposureData] = useState<TodayExposureData | null>(null);
-  const [isTracking, setIsTracking] = useState<boolean>(true);
-  const [breathingFactor, setBreathingFactor] = useState<number>(1.0);
-  const [isAutoMode, setIsAutoMode] = useState<boolean>(true);
-  const [autoDetectedLabel, setAutoDetectedLabel] = useState<string>("Rest");
-  const [permissionDenied, setPermissionDenied] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lon: number }>({
-    lat: 28.6139,
-    lon: 77.2090,
-  });
 
-  const lastCheckpointRef = useRef<{ lat: number; lon: number; time: number } | null>(null);
-  const lastCoordsRef = useRef<{ lat: number; lon: number; timestamp: number } | null>(null);
-  const lastSpeedRef = useRef<number>(0);
-  const watchIdRef = useRef<number | null>(null);
-
-  // Load exposure data on mount without resetting on refresh
-  const loadExposureSummary = useCallback(async () => {
-    try {
-      const data = await fetchTodayExposure();
-      setExposureData(data);
-      if (data.tracking) {
-        setIsTracking(true);
-      }
-    } catch (err) {
-      console.warn("Could not load today exposure:", err);
-    }
-  }, []);
-
-  // Classify physical activity mode based on real-time speed
-  const detectAutoActivity = useCallback((speedMps?: number | null): { factor: number; label: string } => {
-    if (speedMps === null || speedMps === undefined || isNaN(speedMps) || speedMps < 0.5) {
-      return { factor: 1.0, label: "Rest" };
-    }
-    // High speed (> 6.0 m/s or > 21.6 km/h) -> In Vehicle / Transit
-    if (speedMps > 6.0) {
-      return { factor: 1.1, label: "Transit" };
-    }
-    // Moderate-high speed (2.5 to 6.0 m/s, ~9 to 21.6 km/h) -> Running / Jogging
-    if (speedMps > 2.5) {
-      return { factor: 3.5, label: "Running" };
-    }
-    // Moderate speed (0.5 to 2.5 m/s, ~1.8 to 9 km/h) -> Walking
-    return { factor: 1.8, label: "Walking" };
-  }, []);
-
-  // Compute speed from hardware GPS or fallback displacement (meters / second)
-  const calculateMotionSpeed = useCallback(
-    (
-      coords: { latitude: number; longitude: number; speed?: number | null },
-      timestamp: number = Date.now()
-    ): number => {
-      let speed = coords.speed;
-
-      // If browser provides a valid positive speed, use it directly
-      if (speed !== null && speed !== undefined && !isNaN(speed) && speed > 0) {
-        lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
-        lastSpeedRef.current = speed;
-        return speed;
-      }
-
-      // Fallback: calculate displacement speed from Haversine distance
-      if (lastCoordsRef.current) {
-        const distKm = calculateHaversineDistance(
-          coords.latitude,
-          coords.longitude,
-          lastCoordsRef.current.lat,
-          lastCoordsRef.current.lon
-        );
-        const timeDeltaSec = (timestamp - lastCoordsRef.current.timestamp) / 1000;
-
-        if (timeDeltaSec >= 1) {
-          const distMeters = distKm * 1000;
-          // Filter minor GPS drift/jitter (< 2 meters)
-          if (distMeters >= 2.0) {
-            speed = distMeters / timeDeltaSec;
-          } else {
-            speed = 0;
-          }
-          lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
-          lastSpeedRef.current = speed;
-          return speed;
-        }
-        return lastSpeedRef.current;
-      }
-
-      lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
-      lastSpeedRef.current = 0;
-      return 0;
-    },
-    []
-  );
-
-  // Send a location tick to backend exposure engine (checkpointed)
-  const sendExposureTick = useCallback(
-    async (
-      lat: number,
-      lon: number,
-      accuracy?: number,
-      speed?: number,
-      heading?: number,
-      force: boolean = false,
-      customBreathingFactor?: number
-    ) => {
-      const now = Date.now();
-      const last = lastCheckpointRef.current;
-
-      // Rate limit checkpoints: require >= 25m movement OR >= 60s elapsed unless force is true
-      if (!force && last) {
-        const dist = calculateHaversineDistance(lat, lon, last.lat, last.lon);
-        const elapsedSec = (now - last.time) / 1000;
-        if (dist < 25 && elapsedSec < 60) {
-          return; // Skip tick - live counter runs locally on frontend!
-        }
-      }
-
-      try {
-        lastCheckpointRef.current = { lat, lon, time: now };
-        const factorToUse = customBreathingFactor ?? breathingFactor;
-        const res = await trackLocationTick({
-          latitude: lat,
-          longitude: lon,
-          accuracy: accuracy ?? null,
-          speed: speed ?? null,
-          heading: heading ?? null,
-          breathing_factor: factorToUse,
-          client_timestamp: now / 1000,
-        });
-
-        if (res && res.state) {
-          setExposureData((prev) => {
-            const currentObj = {
-              pm25: res.state.pm25,
-              environment: res.state.location_type,
-              location_id: res.state.location_id,
-              location_name: res.state.location_name,
-              infiltration_factor: res.state.infiltration_factor,
-              breathing_factor: res.state.breathing_factor,
-              base_breathing_rate_m3_s: res.state.base_breathing_rate_m3_s,
-              inhalation_rate_ug_s: res.state.inhalation_rate_ug_s,
-              last_pollution_updated_seconds_ago: 0,
-            };
-
-            const updatedContribs = { ...(prev?.contributions || {}) };
-            const envKey = res.state.location_type;
-            updatedContribs[envKey] = (updatedContribs[envKey] || 0) + res.state.accumulated_exposure_ug;
-
-            return {
-              date: prev?.date || new Date().toISOString().split("T")[0],
-              total_exposure_ug: res.total_exposure_ug,
-              current: currentObj,
-              contributions: updatedContribs,
-              tracking: true,
-            };
-          });
-        }
-      } catch (err) {
-        console.warn("Error sending exposure tick:", err);
-      }
-    },
-    [breathingFactor]
-  );
-
-  // Authenticate session & load initial data
-  useEffect(() => {
-    const currentUser = getStoredUser();
-    if (!currentUser) {
-      router.push("/signin");
-      return;
-    }
-    setUser(currentUser);
-
-    // 1. Load today's exposure summary and active tracking status
-    loadExposureSummary();
-
-    // 2. Fetch air quality via backend spatio-temporal cache
-    loadAirQuality(userCoords.lat, userCoords.lon, false);
-
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-          setUserCoords(coords);
-          loadAirQuality(coords.lat, coords.lon, false);
-          // Initial exposure tracking tick
-          sendExposureTick(
-            coords.lat,
-            coords.lon,
-            pos.coords.accuracy,
-            pos.coords.speed || undefined,
-            pos.coords.heading || undefined,
-            true
-          );
-        },
-        (err) => {
-          console.warn("Geolocation fallback to default coords:", err);
-          if (err.code === err.PERMISSION_DENIED) {
-            setPermissionDenied(true);
-          }
-          loadAirQuality(28.6139, 77.2090, false);
-          sendExposureTick(28.6139, 77.2090, 15, undefined, undefined, true);
-        },
-        { timeout: 8000 }
-      );
-    } else {
-      loadAirQuality(28.6139, 77.2090, false);
-      sendExposureTick(28.6139, 77.2090, 15, undefined, undefined, true);
-    }
-  }, [router, loadExposureSummary, sendExposureTick]);
-
-  // High-accuracy location watcher for continuous exposure tracking
-  useEffect(() => {
-    if (!isTracking) {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      return;
-    }
-
-    if ("geolocation" in navigator) {
-      const id = navigator.geolocation.watchPosition(
-        (pos) => {
-          const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-          setUserCoords(coords);
-
-          const motionSpeed = calculateMotionSpeed(pos.coords, Date.now());
-
-          let currentBf = breathingFactor;
-          if (isAutoMode) {
-            const detected = detectAutoActivity(motionSpeed);
-            setAutoDetectedLabel(detected.label);
-            if (Math.abs(detected.factor - breathingFactor) > 0.05) {
-              setBreathingFactor(detected.factor);
-              currentBf = detected.factor;
-            }
-          }
-
-          sendExposureTick(
-            coords.lat,
-            coords.lon,
-            pos.coords.accuracy,
-            motionSpeed || undefined,
-            pos.coords.heading || undefined,
-            false,
-            currentBf
-          );
-        },
-        (err) => {
-          if (err.code === err.PERMISSION_DENIED) {
-            setPermissionDenied(true);
-          }
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-      );
-      watchIdRef.current = id;
-    }
-
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-    };
-  }, [isTracking, sendExposureTick, isAutoMode, breathingFactor, detectAutoActivity, calculateMotionSpeed]);
-
-  // Physical motion detection for mobile devices (when GPS is stationary/indoors)
-  useEffect(() => {
-    if (!isAutoMode) return;
-
-    let motionCount = 0;
-    let totalMagnitude = 0;
-
-    const handleMotion = (event: DeviceMotionEvent) => {
-      const acc = event.acceleration;
-      if (acc && acc.x !== null && acc.y !== null && acc.z !== null) {
-        const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
-        totalMagnitude += mag;
-        motionCount++;
-
-        // Process batch every ~15 samples
-        if (motionCount >= 15) {
-          const avgMag = totalMagnitude / motionCount;
-          motionCount = 0;
-          totalMagnitude = 0;
-
-          // If GPS reports stationary (< 0.5 m/s), check accelerometer
-          if (lastSpeedRef.current < 0.5) {
-            if (avgMag > 4.5) {
-              setAutoDetectedLabel("Running");
-              setBreathingFactor(3.5);
-            } else if (avgMag > 1.2) {
-              setAutoDetectedLabel("Walking");
-              setBreathingFactor(1.8);
-            }
-          }
-        }
-      }
-    };
-
-    if (typeof window !== "undefined" && "DeviceMotionEvent" in window) {
-      window.addEventListener("devicemotion", handleMotion);
-    }
-    return () => {
-      if (typeof window !== "undefined" && "DeviceMotionEvent" in window) {
-        window.removeEventListener("devicemotion", handleMotion);
-      }
-    };
-  }, [isAutoMode]);
-
-  const loadAirQuality = async (lat?: number, lon?: number, forceRefresh: boolean = false) => {
-    const targetLat = lat ?? userCoords.lat;
-    const targetLon = lon ?? userCoords.lon;
+  const loadAirQuality = useCallback(async (lat: number, lon: number, forceRefresh: boolean = false) => {
     try {
       setRefreshing(true);
-      const data = await fetchAirQuality(targetLat, targetLon, forceRefresh);
+      const data = await fetchAirQuality(lat, lon, forceRefresh);
       setAirData(data);
     } catch (err) {
       console.error("Error loading OpenAQ air quality data:", err);
@@ -360,66 +41,42 @@ export default function DashboardPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  const handleToggleTracking = async () => {
-    if (isTracking) {
-      // Pause / Stop tracking
-      try {
-        await stopExposureTracking();
-        setIsTracking(false);
-        loadExposureSummary();
-      } catch (err) {
-        console.error("Failed to stop tracking:", err);
-      }
-    } else {
-      // Start tracking
-      setIsTracking(true);
-      sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true);
-    }
-  };
+  const {
+    userCoords,
+    exposureData,
+    isTracking,
+    breathingFactor,
+    isAutoMode,
+    autoDetectedLabel,
+    permissionDenied,
+    loadExposureSummary,
+    handleToggleTracking,
+    handleAutoModeChange,
+    handleBreathingFactorChange,
+    recordCurrentTick,
+    stopTrackingOnExit,
+  } = useExposureTracker({
+    initialCoords: { lat: 28.6139, lon: 77.2090 },
+    onCoordsChange: (coords) => {
+      loadAirQuality(coords.lat, coords.lon, false);
+    },
+  });
 
-  const handleAutoModeChange = (auto: boolean, cycleSimulated?: boolean) => {
-    setIsAutoMode(auto);
-    if (auto) {
-      if (cycleSimulated) {
-        // Allows testing auto-switching cycle on desktop/laptops without physical displacement
-        const cycleOrder: Array<{ label: string; factor: number }> = [
-          { label: "Rest", factor: 1.0 },
-          { label: "Walking", factor: 1.8 },
-          { label: "Running", factor: 3.5 },
-          { label: "Transit", factor: 1.1 },
-        ];
-        const currentIndex = cycleOrder.findIndex((m) => m.label === autoDetectedLabel);
-        const nextState = cycleOrder[(currentIndex + 1) % cycleOrder.length];
-        setAutoDetectedLabel(nextState.label);
-        setBreathingFactor(nextState.factor);
-        if (isTracking) {
-          sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true, nextState.factor);
-        }
-      } else {
-        const detected = detectAutoActivity(lastSpeedRef.current);
-        setAutoDetectedLabel(detected.label);
-        setBreathingFactor(detected.factor);
-        if (isTracking) {
-          sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true, detected.factor);
-        }
-      }
+  // Authenticate session & load initial air quality
+  useEffect(() => {
+    const currentUser = getStoredUser();
+    if (!currentUser) {
+      router.push("/signin");
+      return;
     }
-  };
-
-  const handleBreathingFactorChange = (newFactor: number) => {
-    setIsAutoMode(false);
-    setBreathingFactor(newFactor);
-    if (isTracking) {
-      sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true, newFactor);
-    }
-  };
+    setUser(currentUser);
+    loadAirQuality(userCoords.lat, userCoords.lon, false);
+  }, [router, loadAirQuality, userCoords.lat, userCoords.lon]);
 
   const handleLogout = () => {
-    if (isTracking) {
-      stopExposureTracking().catch(() => {});
-    }
+    stopTrackingOnExit();
     clearSession();
     router.push("/signin");
   };
@@ -472,7 +129,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
-                  loadAirQuality(undefined, undefined, true);
+                  loadAirQuality(userCoords.lat, userCoords.lon, true);
                   loadExposureSummary();
                 }}
                 disabled={refreshing}
@@ -484,7 +141,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 1. Personal Exposure Tracking Hero (Matches Reference) */}
+          {/* 1. Personal Exposure Tracking Hero */}
           <TodayExposureHero
             userName={user?.name}
             userId={user?.id}
@@ -528,9 +185,7 @@ export default function DashboardPage() {
             <div className="lg:col-span-2">
               <CurrentLocationCard
                 userId={user?.id}
-                onLocationSaved={() => {
-                  sendExposureTick(userCoords.lat, userCoords.lon, 10, undefined, undefined, true);
-                }}
+                onLocationSaved={recordCurrentTick}
               />
             </div>
           </div>
