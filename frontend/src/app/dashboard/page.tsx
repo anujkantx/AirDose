@@ -2,16 +2,16 @@
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
-import DashboardNavbar from "@/components/DashboardNavbar";
-import TodayExposureHero from "@/components/TodayExposureHero";
-import ExposureContributionCard from "@/components/ExposureContributionCard";
-import ExposureHistoryChart from "@/components/ExposureHistoryChart";
-import AirQualityHero from "@/components/AirQualityHero";
-import PollutantGrid from "@/components/PollutantGrid";
-import StationInfoCard from "@/components/StationInfoCard";
-import CurrentLocationCard from "@/components/CurrentLocationCard";
-import CleanAirAdvisoryCard from "@/components/CleanAirAdvisoryCard";
+import Sidebar from "@/components/layout/Sidebar";
+import DashboardNavbar from "@/components/layout/DashboardNavbar";
+import TodayExposureHero from "@/components/dashboard/TodayExposureHero";
+import ExposureContributionCard from "@/components/dashboard/ExposureContributionCard";
+import ExposureHistoryChart from "@/components/dashboard/ExposureHistoryChart";
+import AirQualityHero from "@/components/air-quality/AirQualityHero";
+import PollutantGrid from "@/components/air-quality/PollutantGrid";
+import StationInfoCard from "@/components/air-quality/StationInfoCard";
+import CleanAirAdvisoryCard from "@/components/air-quality/CleanAirAdvisoryCard";
+import CurrentLocationCard from "@/components/locations/CurrentLocationCard";
 import {
   getStoredUser,
   clearSession,

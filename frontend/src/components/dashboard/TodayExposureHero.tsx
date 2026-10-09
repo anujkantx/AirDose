@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { TodayExposureData, UserLocation, fetchUserLocations } from "@/lib/api";
 import { calculateHaversineDistance, formatDistance } from "@/lib/haversine";
-import CommuteSimulatorModal from "@/components/CommuteSimulatorModal";
+import CommuteSimulatorModal from "./CommuteSimulatorModal";
 
 interface TodayExposureHeroProps {
   userName?: string;

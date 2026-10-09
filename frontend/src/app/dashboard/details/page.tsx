@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
-import DashboardNavbar from "@/components/DashboardNavbar";
+import Sidebar from "@/components/layout/Sidebar";
+import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import { getStoredUser, clearSession, User } from "@/lib/api";
 import {
   BookOpen,
