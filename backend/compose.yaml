@@ -1,0 +1,34 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airdose-backend
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=${PORT:-8000}
+      - OPENAQ_API_KEY=${OPENAQ_API_KEY:-}
+      - DB_PATH=/app/data/airdose.db
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - airdose_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request, os; port = os.getenv('PORT', '8000'); urllib.request.urlopen(f'http://127.0.0.1:{port}/health')"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  airdose_data:

@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Python & Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local Environment & Secrets (Never bake into image)
+.env
+.env.*
+!.env.example
+
+# Database & SQLite files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+airdose.db
+
+# IDE & OS Artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docker configuration files
+Dockerfile
+.dockerignore
+compose.yaml
+docker-compose*.yaml

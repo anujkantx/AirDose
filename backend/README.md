@@ -63,3 +63,50 @@ Interactive Swagger documentation is available at: `http://localhost:8000/docs`
 ```bash
 python -m unittest discover tests
 ```
+
+---
+
+## 🐳 Docker Deployment
+
+The backend is fully containerized with a production-ready, non-root Docker setup and volume-backed SQLite persistence.
+
+### Option A: Using Docker Compose (Recommended for Local Dev)
+```bash
+# From the backend directory:
+docker compose up --build
+
+# Run in background (detached):
+docker compose up -d
+
+# Check service status and health:
+docker compose ps
+
+# View logs:
+docker compose logs -f
+
+# Stop container (preserves database volume):
+docker compose down
+```
+
+### Option B: Using Standalone Docker
+```bash
+# Build the Docker image:
+docker build -t airdose-backend:latest .
+
+# Run the container:
+docker run -d \
+  --name airdose-backend \
+  -p 8000:8000 \
+  -e PORT=8000 \
+  -e DB_PATH=/app/data/airdose.db \
+  -v airdose_data:/app/data \
+  airdose-backend:latest
+
+# Check health and logs:
+docker ps
+docker logs -f airdose-backend
+```
+
+- **Health Check Endpoint**: `http://localhost:8000/health`
+- **Swagger Documentation**: `http://localhost:8000/docs`
+
