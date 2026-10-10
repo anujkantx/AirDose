@@ -70,7 +70,7 @@ export default function ExposureContributionCard({
   ];
 
   return (
-    <div className="bg-white rounded-[26px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between">
+    <div className="bg-white rounded-[26px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between min-w-0">
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
