@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f0f3f8;
+  --background: #f8fafc;
   --foreground: #0f172a;
 }
 
 body {
-  background-color: #f0f3f8;
+  background-color: #f8fafc;
   color: #0f172a;
   min-height: 100vh;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;

@@ -284,3 +284,45 @@ export function clearSession() {
   localStorage.removeItem("airdose_user");
   localStorage.removeItem("airdose_token");
 }
+
+// Amazon Bedrock AI Exposure Advisor APIs
+export async function askAiAdvisor(
+  request: import("@/types").AdvisorRequest
+): Promise<import("@/types").AdvisorResponse> {
+  const res = await fetch(`${API_BASE}/api/ai/advisor`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Failed to get advice from Amazon Bedrock");
+  }
+  return res.json();
+}
+
+export async function explainExposureApi(
+  request: import("@/types").ExplainExposureRequest
+): Promise<import("@/types").ExplainExposureResponse> {
+  const res = await fetch(`${API_BASE}/api/ai/explain-exposure`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Failed to explain exposure with Bedrock");
+  }
+  return res.json();
+}
+
+export async function getAiStatusApi(): Promise<import("@/types").AiStatusResponse> {
+  const res = await fetch(`${API_BASE}/api/ai/status`, {
+    headers: getAuthHeaders(),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error("Failed to check Bedrock status");
+  }
+  return res.json();
+}

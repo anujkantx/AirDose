@@ -48,6 +48,7 @@ interface TodayExposureHeroProps {
   onAutoModeChange?: (auto: boolean, cycleSimulated?: boolean) => void;
   autoDetectedLabel?: string;
   permissionDenied?: boolean;
+  onOpenAiAdvisor?: (mode: "chat" | "explain") => void;
 }
 
 export default function TodayExposureHero({
@@ -63,6 +64,7 @@ export default function TodayExposureHero({
   onAutoModeChange,
   autoDetectedLabel = "Rest",
   permissionDenied,
+  onOpenAiAdvisor,
 }: TodayExposureHeroProps) {
   const [internalAutoMode, setInternalAutoMode] = useState<boolean>(isAutoMode);
   const autoModeActive = isAutoMode !== undefined ? isAutoMode : internalAutoMode;
@@ -221,15 +223,15 @@ export default function TodayExposureHero({
     <div className="space-y-4">
       {/* Top Controls Header: Live Telemetry Status, Exertion Selector & Commute Simulator CTA */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1 pb-1">
-        {/* Left: Quick Activity Exertion Selector (Auto + Manual Rest, Walk, Run, Workout - Zero Emojis) */}
-        <div className="flex items-center gap-1.5 bg-black p-1 rounded-full border border-slate-200/80 shadow-soft overflow-x-auto max-w-full">
+        {/* Left: Quick Activity Exertion Selector */}
+        <div className="flex items-center gap-1.5 bg-white p-1 rounded-full border border-slate-200/90 shadow-xs overflow-x-auto max-w-full">
 
           {/* Auto Mode Button */}
           <button
             type="button"
             onClick={handleToggleAuto}
             className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${autoModeActive
-              ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/30 scale-102"
+              ? "bg-[#0062ff] text-white shadow-sm shadow-blue-500/30 scale-102"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             title={
@@ -277,9 +279,8 @@ export default function TodayExposureHero({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2 self-end sm:self-auto">
-
           {/* Tracking Status Pill */}
-          <div className="flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full border border-slate-200/80 shadow-sm text-xs font-semibold text-slate-700">
+          <div className="flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full border border-slate-200 shadow-xs text-xs font-semibold text-slate-700">
             <span className={`w-2 h-2 rounded-full ${isTracking ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
             <span>{isTracking ? "Live Dosimeter" : "Paused"}</span>
           </div>
@@ -310,23 +311,23 @@ export default function TodayExposureHero({
       {/* Grid: 3 Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
 
-        {/* Card 1: Contrast Obsidian Dark Card (Live PM2.5 Dosimeter + Breaths Pulse) */}
-        <div className="lg:col-span-4 bg-[#090d16] text-white rounded-[28px] p-6 shadow-xl border border-slate-800/80 flex flex-col justify-between relative overflow-hidden">
+        {/* Card 1: Live PM2.5 Dosimeter */}
+        <div className="lg:col-span-4 bg-white text-slate-900 rounded-[28px] p-6 shadow-soft border border-slate-200/80 flex flex-col justify-between relative overflow-hidden">
           {/* Subtle Dynamic Ambient Pulse Glow */}
           <div
-            className={`absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10 transition-all duration-700 ${isTracking ? "bg-blue-500/25 animate-pulse" : "bg-slate-700/10"
+            className={`absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10 transition-all duration-700 ${isTracking ? "bg-blue-500/10" : "bg-slate-200/20"
               }`}
           />
 
           <div>
             <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
-                <HeartPulse className="w-4 h-4 text-blue-400" />
+              <span className="text-xs font-extrabold uppercase tracking-wider text-[#0062ff] flex items-center gap-1.5">
+                <HeartPulse className="w-4 h-4 text-[#0062ff]" />
                 Live Inhalation Dosimeter
               </span>
               <button
                 onClick={() => setIsFormulaModalOpen(true)}
-                className="text-slate-400 hover:text-white p-1 transition-colors"
+                className="text-slate-400 hover:text-slate-700 p-1 transition-colors"
                 title="View mathematical kinetics"
               >
                 <Info className="w-4 h-4" />
@@ -334,14 +335,14 @@ export default function TodayExposureHero({
             </div>
 
             <div className="flex items-center gap-5 my-2">
-              {/* Radial Gauge with Real-time Breath Pulsing Halo */}
+              {/* Radial Gauge with Real-time Breath Pulsing */}
               <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96">
                   <circle
                     cx="48"
                     cy="48"
                     r="40"
-                    stroke="#1e2433"
+                    stroke="#f1f5f9"
                     strokeWidth="9"
                     fill="transparent"
                   />
@@ -359,7 +360,7 @@ export default function TodayExposureHero({
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black text-white font-mono tracking-tight leading-none">
+                  <span className="text-2xl font-black text-slate-900 font-mono tracking-tight leading-none">
                     {liveDisplayExposure.toFixed(1)}
                   </span>
                   <span className="text-[10px] font-mono text-slate-400 mt-0.5">μg PM₂.₅</span>
@@ -369,21 +370,21 @@ export default function TodayExposureHero({
               {/* Shock-Value Health Benchmarks */}
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-medium">Cigarette Impact:</span>
-                  <span className="inline-flex items-center gap-1 bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs font-black font-mono px-2 py-0.5 rounded-full">
-                    <Cigarette className="w-3 h-3 text-amber-400" />
+                  <span className="text-xs text-slate-500 font-medium">Cigarette Impact:</span>
+                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-black font-mono px-2 py-0.5 rounded-full">
+                    <Cigarette className="w-3 h-3 text-amber-600" />
                     ~{liveCigarettes} cigs
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-medium">WHO 24h Cap:</span>
+                  <span className="text-xs text-slate-500 font-medium">WHO 24h Cap:</span>
                   <span
                     className={`text-xs font-black font-mono px-2 py-0.5 rounded-full ${whoPercentage <= 50
-                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                       : whoPercentage <= 100
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                        : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : "bg-rose-50 text-rose-700 border border-rose-200"
                       }`}
                   >
                     {whoPercentage}% of limit
@@ -391,7 +392,7 @@ export default function TodayExposureHero({
                 </div>
 
                 <div className="pt-1">
-                  <span className="text-[10px] text-slate-500">
+                  <span className="text-[10px] text-slate-400">
                     Berkeley Earth standard: 20 µg PM2.5 ≈ 1 cigarette dose.
                   </span>
                 </div>
@@ -400,32 +401,44 @@ export default function TodayExposureHero({
           </div>
 
           {/* Instant Rate Telemetry Footer */}
-          <div className="pt-3.5 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono">
-            <span className="text-slate-400 flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${isTracking ? "bg-emerald-400 animate-pulse" : "bg-slate-600"}`} />
+          <div className="pt-3.5 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-mono">
+            <span className="text-slate-500 flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${isTracking ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
               Inhalation Velocity
             </span>
-            <span className="text-emerald-400 font-extrabold text-sm">
+            <span className="text-emerald-600 font-extrabold text-sm">
               {`${activeRate.toFixed(5)} μg/s`}
             </span>
+          </div>
+
+          {/* Explain My Exposure with Amazon Bedrock */}
+          <div className="pt-2.5 mt-2.5 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => onOpenAiAdvisor?.("explain")}
+              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Explain My Exposure with Bedrock AI</span>
+            </button>
           </div>
         </div>
 
         {/* Card 2: Micro-Environment Breakdown & Clean Air Shield */}
-        <div className="lg:col-span-4 bg-white rounded-[28px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between">
+        <div className="lg:col-span-4 bg-white rounded-[28px] p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-slate-400" />
                 Micro-Environment Breakdown
               </span>
-              <button
-                onClick={() => setIsSimulatorOpen(true)}
+              <Link
+                href="/dashboard/simulate"
                 className="text-xs text-[#0062ff] hover:underline font-bold flex items-center gap-0.5"
               >
                 <span>Simulate</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
-              </button>
+              </Link>
             </div>
 
             <div className="space-y-3 my-2">
@@ -443,7 +456,7 @@ export default function TodayExposureHero({
                       </span>
                     </div>
 
-                    <div className="h-2 w-full bg-[#f0f3f8] rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div
                         style={{ width: `${Math.max(percentage, 5)}%` }}
                         className={`h-full rounded-full ${cat.color} transition-all duration-700`}
@@ -468,7 +481,7 @@ export default function TodayExposureHero({
         </div>
 
         {/* Card 3: Live Kinetic Variables & Geofence Radar */}
-        <div className="lg:col-span-4 bg-white rounded-[28px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between space-y-3">
+        <div className="lg:col-span-4 bg-white rounded-[28px] p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between space-y-3">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -484,7 +497,7 @@ export default function TodayExposureHero({
                 <button
                   onClick={() => setIsFormulaModalOpen(true)}
                   title="View Formula & Kinetics"
-                  className="w-7 h-7 rounded-full bg-blue-50 hover:bg-blue-100 text-[#0062ff] border border-blue-200/60 flex items-center justify-center transition-all shadow-sm"
+                  className="w-7 h-7 rounded-full bg-blue-50 hover:bg-blue-100 text-[#0062ff] border border-blue-200/60 flex items-center justify-center transition-all shadow-xs"
                 >
                   <Info className="w-3.5 h-3.5" />
                 </button>

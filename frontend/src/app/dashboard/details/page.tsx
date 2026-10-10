@@ -53,7 +53,7 @@ export default function ExposureDetailsPage() {
   const doseMgPerDay = (rateUgPerHour * 24) / 1000;
 
   return (
-    <div className="min-h-screen bg-[#f0f3f8] text-slate-900 flex font-sans">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex font-sans">
       {/* 1. Sidebar */}
       <Sidebar
         user={user}
@@ -92,12 +92,12 @@ export default function ExposureDetailsPage() {
           </div>
 
           {/* Master Formula Hero Banner */}
-          <div className="bg-[#0f1117] text-white rounded-[26px] p-6 sm:p-8 shadow-card relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/15 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+          <div className="bg-white text-slate-900 rounded-[26px] p-6 sm:p-8 shadow-soft border border-slate-200/80 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
 
             <div className="relative z-10 space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">
                   Primary Governing Equation
                 </span>
                 <span className="text-xs font-bold bg-[#ccf82f] text-slate-950 px-3 py-1 rounded-full shadow-sm">
@@ -106,17 +106,17 @@ export default function ExposureDetailsPage() {
               </div>
 
               {/* Formula Display Box */}
-              <div className="p-4 sm:p-6 rounded-2xl bg-slate-900/90 border border-slate-800 text-center font-mono overflow-x-auto">
-                <div className="text-lg sm:text-2xl font-black text-white tracking-wide leading-relaxed">
+              <div className="p-4 sm:p-6 rounded-2xl bg-slate-50 border border-slate-200 text-center font-mono overflow-x-auto">
+                <div className="text-lg sm:text-2xl font-black text-slate-900 tracking-wide leading-relaxed">
                   <span className="text-[#0062ff]">Inhalation Rate (μg/s)</span> ={" "}
-                  <span className="text-amber-400">PM2.5 (μg/m³)</span> ×{" "}
-                  <span className="text-emerald-400">Infiltration Factor (If)</span> ×{" "}
-                  <span className="text-purple-400">Breathing Factor (Bf)</span> ×{" "}
-                  <span className="text-cyan-400">Base Breathing Rate (VE)</span>
+                  <span className="text-amber-600">PM2.5 (μg/m³)</span> ×{" "}
+                  <span className="text-emerald-600">Infiltration Factor (If)</span> ×{" "}
+                  <span className="text-purple-600">Breathing Factor (Bf)</span> ×{" "}
+                  <span className="text-sky-600">Base Breathing Rate (VE)</span>
                 </div>
               </div>
 
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-3xl">
                 AirDose calculates continuous respiratory particulate dosage by combining real-time spatial air quality, location infiltration mechanics, and metabolic activity rate into instantaneous microgram dosage.
               </p>
             </div>
@@ -234,44 +234,44 @@ export default function ExposureDetailsPage() {
               </div>
 
               {/* Live Output Rates (5 cols) */}
-              <div className="lg:col-span-5 bg-[#0f1117] text-white rounded-2xl p-6 flex flex-col justify-between space-y-4">
+              <div className="lg:col-span-5 bg-white text-slate-900 border border-slate-200/80 shadow-soft rounded-2xl p-6 flex flex-col justify-between space-y-4">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
                     Calculated Inhalation Output
                   </span>
                   <div className="mt-4 space-y-3">
-                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-medium">Per Second (μg/s)</span>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-slate-500 font-medium">Per Second (μg/s)</span>
                       <span className="text-lg font-bold font-mono text-[#0062ff]">
                         {rateUgPerSec.toFixed(6)} μg/s
                       </span>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-medium">Per Minute (μg/min)</span>
-                      <span className="text-lg font-bold font-mono text-emerald-400">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-slate-500 font-medium">Per Minute (μg/min)</span>
+                      <span className="text-lg font-bold font-mono text-emerald-600">
                         {rateUgPerMin.toFixed(4)} μg/min
                       </span>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-medium">Per Hour (μg/hr)</span>
-                      <span className="text-xl font-black font-mono text-amber-400">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-slate-500 font-medium">Per Hour (μg/hr)</span>
+                      <span className="text-xl font-black font-mono text-amber-600">
                         {rateUgPerHour.toFixed(2)} μg/hr
                       </span>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-                      <span className="text-xs text-slate-400 font-medium">24h Continuous Equivalent</span>
-                      <span className="text-lg font-bold font-mono text-rose-400">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-slate-500 font-medium">24h Continuous Equivalent</span>
+                      <span className="text-lg font-bold font-mono text-rose-600">
                         {doseMgPerDay.toFixed(3)} mg/day
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-800 text-[11px] text-slate-400 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   Continuous accumulation integrated via active time slice: ΔExposure = Rate × Δt
                 </div>
               </div>

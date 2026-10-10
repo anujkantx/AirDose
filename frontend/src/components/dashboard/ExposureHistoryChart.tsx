@@ -148,33 +148,33 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
   const activeCoord = activeIndex !== null ? points[activeIndex] : null;
 
   return (
-    <div className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between min-w-0 overflow-hidden">
+    <div className="bg-white rounded-[28px] p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between min-w-0 overflow-hidden">
       <div>
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <div className="flex items-center flex-wrap gap-2">
               <h3 className="text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-[#0062ff]" />
+                <Activity className="w-4 h-4 text-blue-600" />
                 Inhalation Dose Graph
               </h3>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-[#0062ff] shrink-0">
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 shrink-0">
                 Functional Spline
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5 truncate">
+            <p className="text-xs text-slate-500 mt-0.5 truncate">
               Dynamic continuous retention curve (Berkeley Earth calibrated)
             </p>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
             {/* View Mode Toggle */}
-            <div className="hidden sm:flex items-center bg-slate-100 p-0.5 rounded-full text-xs">
+            <div className="hidden sm:flex items-center bg-slate-100 border border-slate-200 p-0.5 rounded-full text-xs">
               <button
                 onClick={() => setChartType("curve")}
                 title="Continuous Curve"
                 className={`p-1 rounded-full transition-all ${
-                  chartType === "curve" ? "bg-white text-slate-900 shadow-xs" : "text-slate-400 hover:text-slate-800"
+                  chartType === "curve" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 <LineChart className="w-3.5 h-3.5" />
@@ -183,7 +183,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                 onClick={() => setChartType("bars")}
                 title="Discrete Histogram"
                 className={`p-1 rounded-full transition-all ${
-                  chartType === "bars" ? "bg-white text-slate-900 shadow-xs" : "text-slate-400 hover:text-slate-800"
+                  chartType === "bars" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 <BarChart3 className="w-3.5 h-3.5" />
@@ -191,7 +191,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
             </div>
 
             {/* Timeframe Toggle */}
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-full text-xs font-bold">
+            <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 p-0.5 rounded-full text-xs font-bold">
               <button
                 onClick={() => setPeriod("week")}
                 className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-all ${
@@ -275,7 +275,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                     x={padLeft - 6}
                     y={baselineY + 3}
                     textAnchor="end"
-                    className="text-[9px] fill-slate-300 font-mono font-medium"
+                    className="text-[9px] fill-slate-400 font-mono font-medium"
                   >
                     0
                   </text>
@@ -289,13 +289,13 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                     stroke="#f59e0b"
                     strokeDasharray="4 4"
                     strokeWidth="1.2"
-                    opacity="0.65"
+                    opacity="0.75"
                   />
                   <text
                     x={padLeft + graphW}
                     y={whoY - 4}
                     textAnchor="end"
-                    className="text-[9px] fill-amber-500 font-mono font-bold"
+                    className="text-[9px] fill-amber-600 font-mono font-bold"
                   >
                     WHO 25µg Cap
                   </text>
@@ -303,7 +303,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                     x={padLeft - 6}
                     y={whoY + 3}
                     textAnchor="end"
-                    className="text-[9px] fill-amber-400 font-mono font-medium"
+                    className="text-[9px] fill-amber-600 font-mono font-medium"
                   >
                     25
                   </text>
@@ -344,8 +344,8 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                         cx={pt.x}
                         cy={pt.y}
                         r={isToday ? 4.5 : 3}
-                        fill={isToday ? "#0062ff" : isOverWho ? "#f59e0b" : "#ffffff"}
-                        stroke={isToday ? "#ffffff" : isOverWho ? "#d97706" : "#0062ff"}
+                        fill={isToday ? "#2563eb" : isOverWho ? "#f59e0b" : "#ffffff"}
+                        stroke={isToday ? "#ffffff" : isOverWho ? "#d97706" : "#2563eb"}
                         strokeWidth={isToday ? 2.5 : 1.5}
                         className="transition-all duration-200"
                       />
@@ -361,7 +361,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                         x2={activeCoord.x}
                         y1={padTop}
                         y2={baselineY}
-                        stroke="#0062ff"
+                        stroke="#2563eb"
                         strokeDasharray="3 3"
                         strokeWidth="1.2"
                         opacity="0.75"
@@ -372,8 +372,8 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                         cx={activeCoord.x}
                         cy={activeCoord.y}
                         r="9"
-                        fill="#0062ff"
-                        opacity="0.18"
+                        fill="#2563eb"
+                        opacity="0.2"
                         className="animate-ping"
                       />
 
@@ -382,7 +382,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                         cx={activeCoord.x}
                         cy={activeCoord.y}
                         r="5.5"
-                        fill="#0062ff"
+                        fill="#2563eb"
                         stroke="#ffffff"
                         strokeWidth="2.5"
                       />
@@ -411,10 +411,10 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                             period === "month" ? "max-w-[8px] rounded-full" : "max-w-[32px] rounded-2xl"
                           } ${
                             point.isToday
-                              ? "bg-[#0062ff] shadow-md shadow-blue-500/30 ring-2 ring-blue-300/50"
+                              ? "bg-blue-600 shadow-md shadow-blue-500/30 ring-2 ring-blue-300"
                               : point.exposure_ug > 25
                               ? "bg-amber-400 hover:bg-amber-500"
-                              : "bg-[#e8edf5] hover:bg-blue-200"
+                              : "bg-slate-200 hover:bg-slate-300"
                           }`}
                         />
                       </div>
@@ -435,8 +435,8 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                   }}
                   className="absolute -top-3 z-30 pointer-events-none transition-all duration-75"
                 >
-                  <div className="bg-slate-950/95 backdrop-blur-md text-white text-[10px] px-3 py-1.5 rounded-xl shadow-xl border border-slate-800 text-center whitespace-nowrap">
-                    <div className="text-[9px] text-slate-400 font-sans font-medium">
+                  <div className="bg-slate-900/95 backdrop-blur-md text-white text-[10px] px-3 py-1.5 rounded-xl shadow-xl border border-slate-750 text-center whitespace-nowrap">
+                    <div className="text-[9px] text-slate-300 font-sans font-medium">
                       {activePoint.label || activePoint.date}
                     </div>
                     <div className="flex items-center justify-center gap-1.5 mt-0.5">
@@ -465,9 +465,9 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
           )}
 
           {/* X-Axis Milestone Date Labels */}
-          <div className="mt-1 pt-1.5 border-t border-slate-100/70 w-full min-w-0">
+          <div className="mt-1 pt-1.5 border-t border-slate-100 w-full min-w-0">
             {period === "week" ? (
-              <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold px-2">
+              <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold px-2">
                 {data.map((point, idx) => {
                   const isToday = point.isToday;
                   const isActive = activeIndex === idx;
@@ -476,10 +476,10 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                       key={point.date}
                       className={`transition-colors ${
                         isActive
-                          ? "text-[#0062ff] font-extrabold"
+                          ? "text-blue-600 font-extrabold"
                           : isToday
-                          ? "text-[#0062ff] font-bold"
-                          : "text-slate-400"
+                          ? "text-blue-600 font-bold"
+                          : "text-slate-500"
                       }`}
                     >
                       {isToday ? "Today" : point.label.split(" ")[0]}
@@ -488,12 +488,12 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                 })}
               </div>
             ) : (
-              <div className="flex items-center justify-between px-2 text-[10px] font-medium text-slate-400">
+              <div className="flex items-center justify-between px-2 text-[10px] font-medium text-slate-500">
                 <span>{formatAxisDate(data[0]?.date) || "30d ago"}</span>
                 <span>{formatAxisDate(data[Math.floor(data.length * 0.25)]?.date) || "21d"}</span>
                 <span>{formatAxisDate(data[Math.floor(data.length * 0.5)]?.date) || "14d"}</span>
                 <span>{formatAxisDate(data[Math.floor(data.length * 0.75)]?.date) || "7d"}</span>
-                <span className="text-[#0062ff] font-bold">Today</span>
+                <span className="text-blue-600 font-bold">Today</span>
               </div>
             )}
           </div>
@@ -503,14 +503,14 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
       {/* Summary Metrics Strip */}
       <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
         <span className="flex items-center gap-1.5">
-          <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+          <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
           <span>Average Daily Intake:</span>
         </span>
         <div className="flex items-center gap-2">
           <span className="font-extrabold text-slate-900 font-mono">
             {avgVal} μg/day
           </span>
-          <span className="text-[11px] text-amber-600 font-mono font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+          <span className="text-[11px] text-amber-700 font-mono font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
             ~{avgCigs} cigs
           </span>
           <span className="hidden sm:inline-block text-[10px] text-slate-400 font-mono">

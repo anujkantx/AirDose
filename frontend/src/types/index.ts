@@ -215,3 +215,84 @@ export interface ActivityModeOption {
   factor: number;
   iconName: string;
 }
+
+// Amazon Bedrock AI Exposure Advisor Contracts
+export interface ExposureContext {
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  pollutant?: string;
+  concentration: number;
+  unit?: string;
+  aqi?: number | null;
+  activity?: string;
+  duration_minutes?: number;
+  breathing_factor?: number;
+  infiltration_factor?: number;
+  total_exposure_ug?: number;
+  inhalation_rate_ug_s?: number;
+  cigarettes_equivalent?: number;
+  who_percentage?: number;
+  who_status?: string;
+  clean_air_shield_saved_ug?: number;
+  data_source?: string;
+  observed_at?: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp?: string;
+  model_provider?: string;
+  data_source?: string;
+  error_type?: string;
+}
+
+export interface AdvisorRequest {
+  message: string;
+  context?: ExposureContext | null;
+  conversation_history?: ChatMessage[];
+  hypothetical_activity?: string;
+  hypothetical_duration_minutes?: number;
+}
+
+export interface AdvisorResponse {
+  success: boolean;
+  answer: string;
+  model_provider: string;
+  model_id?: string;
+  data_source: string;
+  calculated_context?: Record<string, any>;
+  error_type?: string;
+  error_detail?: string;
+}
+
+export interface ExplainExposureRequest {
+  context?: ExposureContext | null;
+  user_id?: number;
+}
+
+export interface ExplainExposureResponse {
+  success: boolean;
+  answer: string;
+  summary?: string;
+  breakdown?: string[];
+  actionable_recommendations?: string[];
+  model_provider: string;
+  model_id?: string;
+  data_source: string;
+  calculated_context?: Record<string, any>;
+  error_type?: string;
+  error_detail?: string;
+}
+
+export interface AiStatusResponse {
+  status: string;
+  provider: string;
+  region: string;
+  model_id: string;
+  max_tokens: number;
+  temperature: number;
+  timeout_seconds: number;
+  converse_api_supported: boolean;
+}

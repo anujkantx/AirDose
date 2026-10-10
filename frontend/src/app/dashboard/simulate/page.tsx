@@ -86,7 +86,7 @@ export default function RouteSimulatorPage() {
           async (pos) => {
             try {
               const data = await fetchAirQuality(pos.coords.latitude, pos.coords.longitude);
-              const livePm = data.pollutants?.pm25?.concentration ?? data.aqi ?? 85;
+              const livePm = data.pollutants?.pm25?.value ?? data.aqi ?? 85;
               setAmbientPm25(Math.round(livePm));
             } catch {
               // Fallback default
@@ -152,7 +152,7 @@ export default function RouteSimulatorPage() {
   const savingsUg = simulation?.max_dose_savings_ug ?? 0;
 
   return (
-    <div className="min-h-screen bg-[#f0f3f8] text-slate-900 flex font-sans">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex font-sans">
       {/* 1. Sidebar */}
       <Sidebar
         user={user}

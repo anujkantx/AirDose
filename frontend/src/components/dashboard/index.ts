@@ -3,3 +3,5 @@ export { default as ExposureFormulaModal } from "./ExposureFormulaModal";
 export { default as ExposureContributionCard } from "./ExposureContributionCard";
 export { default as ExposureHistoryChart } from "./ExposureHistoryChart";
 export { default as CommuteSimulatorModal } from "./CommuteSimulatorModal";
+export { default as AiAdvisorModal } from "./AiAdvisorModal";
+export { default as BreatheImpactVisualizer } from "./BreatheImpactVisualizer";

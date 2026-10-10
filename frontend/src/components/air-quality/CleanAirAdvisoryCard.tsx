@@ -39,7 +39,7 @@ export default function CleanAirAdvisoryCard({
   const exerciseAdvice = pm25Val > 100 ? "Indoor rest only" : pm25Val > 55 ? "Light indoor workout" : "Outdoor exercise permitted";
 
   return (
-    <div className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between min-w-0">
+    <div className="bg-white rounded-[28px] p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between min-w-0">
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -47,11 +47,11 @@ export default function CleanAirAdvisoryCard({
               Clean Air Health Advisory
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               Personalized micro-actions based on current inhalation dose
             </p>
           </div>
-          <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0062ff] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
             <Sparkles className="w-4 h-4" />
           </div>
         </div>
@@ -59,13 +59,13 @@ export default function CleanAirAdvisoryCard({
         {/* Advisory List */}
         <div className="space-y-3 my-2">
           {/* Mask Advisory */}
-          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100/90">
+          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
             <div className="flex items-center gap-2.5">
               <div
                 className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 ${
                   maskNeeded
-                    ? "bg-rose-100 text-rose-600"
-                    : "bg-emerald-100 text-emerald-600"
+                    ? "bg-rose-100 text-rose-600 border border-rose-200"
+                    : "bg-emerald-100 text-emerald-600 border border-emerald-200"
                 }`}
               >
                 {maskNeeded ? (
@@ -78,7 +78,7 @@ export default function CleanAirAdvisoryCard({
                 <div className="text-xs font-bold text-slate-800">
                   {maskNeeded ? "N95 / FFP2 Mask Recommended" : "Unmasked Outdoor Safe"}
                 </div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-slate-500">
                   {maskNeeded ? "Ambient particulate above healthy filtration cap" : "Low outdoor ambient risk"}
                 </div>
               </div>
@@ -86,8 +86,8 @@ export default function CleanAirAdvisoryCard({
             <span
               className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
                 maskNeeded
-                  ? "bg-rose-50 text-rose-600 border border-rose-200"
-                  : "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                  ? "bg-rose-100 text-rose-700 border border-rose-200"
+                  : "bg-emerald-100 text-emerald-700 border border-emerald-200"
               }`}
             >
               {maskNeeded ? "Action" : "Clear"}
@@ -95,37 +95,37 @@ export default function CleanAirAdvisoryCard({
           </div>
 
           {/* Ventilation / Window Advice */}
-          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100/90">
+          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-xl bg-blue-100 text-[#0062ff] flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded-xl bg-blue-100 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
                 <Wind className="w-4 h-4" />
               </div>
               <div>
                 <div className="text-xs font-bold text-slate-800">{windowsAdvice}</div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-slate-500">
                   {currentEnv === "OUTDOOR" ? "Switch car to recirculation" : `Current infiltration at ${(infiltration * 100).toFixed(0)}%`}
                 </div>
               </div>
             </div>
-            <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-[#0062ff] border border-blue-200">
+            <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
               Indoor
             </span>
           </div>
 
           {/* Exercise / Exertion Guidance */}
-          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100/90">
+          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded-xl bg-purple-100 text-purple-600 border border-purple-200 flex items-center justify-center shrink-0">
                 <Activity className="w-4 h-4" />
               </div>
               <div>
                 <div className="text-xs font-bold text-slate-800">{exerciseAdvice}</div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] text-slate-500">
                   High exertion increases lung particulate uptake by 3.5×
                 </div>
               </div>
             </div>
-            <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-purple-50 text-purple-600 border border-purple-200">
+            <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200">
               Activity
             </span>
           </div>
@@ -138,10 +138,10 @@ export default function CleanAirAdvisoryCard({
         <span
           className={`font-extrabold font-mono text-xs px-2.5 py-0.5 rounded-full ${
             whoPct > 100
-              ? "bg-rose-100 text-rose-700"
+              ? "bg-rose-100 text-rose-700 border border-rose-200"
               : whoPct > 60
-              ? "bg-amber-100 text-amber-700"
-              : "bg-emerald-100 text-emerald-700"
+              ? "bg-amber-100 text-amber-700 border border-amber-200"
+              : "bg-emerald-100 text-emerald-700 border border-emerald-200"
           }`}
         >
           {whoPct > 100 ? "ELEVATED DOSE" : whoPct > 60 ? "MODERATE DOSE" : "OPTIMAL SHIELD"}

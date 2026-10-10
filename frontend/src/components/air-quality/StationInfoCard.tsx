@@ -14,21 +14,21 @@ export default function StationInfoCard({ station, temperature, humidity }: Stat
   if (!station) return null;
 
   return (
-    <div className="bg-white rounded-[26px] p-6 shadow-soft border border-slate-100 flex flex-col justify-between h-full">
+    <div className="bg-white rounded-[26px] p-6 shadow-soft border border-slate-200/80 flex flex-col justify-between h-full">
       <div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-blue-50 text-[#0062ff] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
               <Radio className="w-4 h-4 animate-pulse" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">
                 Monitoring Station
               </h3>
-              <p className="text-[11px] text-slate-400 font-medium">OpenAQ Sensor Node</p>
+              <p className="text-[11px] text-slate-500 font-medium">OpenAQ Sensor Node</p>
             </div>
           </div>
-          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center gap-1">
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
             <ShieldCheck className="w-3 h-3" /> Live
           </span>
         </div>
@@ -90,7 +90,7 @@ export default function StationInfoCard({ station, temperature, humidity }: Stat
           href={`https://maps.google.com/?q=${station.latitude},${station.longitude}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0062ff] hover:text-blue-700 transition-colors"
+          className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 transition-colors"
         >
           View Map <ArrowUpRight className="w-3.5 h-3.5" />
         </a>
