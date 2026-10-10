@@ -39,7 +39,7 @@ export default function CleanAirAdvisoryCard({
   const exerciseAdvice = pm25Val > 100 ? "Indoor rest only" : pm25Val > 55 ? "Light indoor workout" : "Outdoor exercise permitted";
 
   return (
-    <div className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between">
+    <div className="bg-white rounded-[28px] p-6 border border-slate-100 shadow-soft flex flex-col justify-between min-w-0">
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
