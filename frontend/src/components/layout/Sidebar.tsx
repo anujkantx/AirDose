@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Radio,
   BookOpen,
+  Compass,
 } from "lucide-react";
 import { User } from "@/lib/api";
 
@@ -27,6 +28,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
 
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+    { label: "Simulate Route", icon: Compass, href: "/dashboard/simulate" },
     { label: "Saved Places", icon: MapPin, href: "/dashboard/locations" },
     { label: "Formula & Details", icon: BookOpen, href: "/dashboard/details" },
   ];

@@ -33,7 +33,6 @@ import {
 } from "lucide-react";
 import { TodayExposureData, UserLocation, fetchUserLocations } from "@/lib/api";
 import { calculateHaversineDistance, formatDistance } from "@/lib/haversine";
-import CommuteSimulatorModal from "./CommuteSimulatorModal";
 import ExposureFormulaModal from "./ExposureFormulaModal";
 
 interface TodayExposureHeroProps {
@@ -85,7 +84,6 @@ export default function TodayExposureHero({
   const [locations, setLocations] = useState<UserLocation[]>([]);
   const [lastUpdateSecondsAgo, setLastUpdateSecondsAgo] = useState<number>(0);
   const [isFormulaModalOpen, setIsFormulaModalOpen] = useState<boolean>(false);
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
 
   const baseTotal = exposureData?.total_exposure_ug || 0.0;
   const currentRate = exposureData?.current?.inhalation_rate_ug_s || 0.0;
@@ -279,17 +277,6 @@ export default function TodayExposureHero({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          {/* Commute Simulator Trigger */}
-          <button
-            onClick={() => setIsSimulatorOpen(true)}
-            className="px-3.5 py-1.5 rounded-full text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/80 shadow-sm flex items-center gap-1.5 transition-all hover:border-blue-300"
-          >
-            <Compass className="w-3.5 h-3.5 text-[#0062ff]" />
-            <span>Simulate Route</span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-100 text-[#0062ff] font-extrabold">
-              AI
-            </span>
-          </button>
 
           {/* Tracking Status Pill */}
           <div className="flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-full border border-slate-200/80 shadow-sm text-xs font-semibold text-slate-700">
@@ -652,12 +639,6 @@ export default function TodayExposureHero({
 
       </div>
 
-      {/* Commute Simulator Modal */}
-      <CommuteSimulatorModal
-        isOpen={isSimulatorOpen}
-        onClose={() => setIsSimulatorOpen(false)}
-        initialAmbientPm25={pm25Value}
-      />
 
       {/* Formula & Live Calculation Breakdown Modal */}
       <ExposureFormulaModal
