@@ -70,13 +70,8 @@ export default function TodayExposureHero({
   const autoModeActive = isAutoMode !== undefined ? isAutoMode : internalAutoMode;
 
   const handleToggleAuto = () => {
-    if (autoModeActive) {
-      // Cycle through simulated states in auto mode
-      onAutoModeChange?.(true, true);
-    } else {
-      setInternalAutoMode(true);
-      onAutoModeChange?.(true, false);
-    }
+    setInternalAutoMode(true);
+    onAutoModeChange?.(true, false);
   };
 
   // Live ticker for smooth real-time sub-microgram accumulation

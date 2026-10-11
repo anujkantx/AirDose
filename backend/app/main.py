@@ -42,7 +42,8 @@ app.include_router(exposure.router)
 app.include_router(ai.router)
 
 
-@app.get("/health", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
+@app.get("/health", tags=["Health"], include_in_schema=False)
 def health():
     """Service health check endpoint."""
     return {
