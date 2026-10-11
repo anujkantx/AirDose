@@ -27,6 +27,8 @@ export function useExposureTracker(options?: UseExposureTrackerOptions) {
 
   const lastCheckpointRef = useRef<{ lat: number; lon: number; time: number } | null>(null);
   const lastCoordsRef = useRef<{ lat: number; lon: number; timestamp: number } | null>(null);
+  const stationaryAnchorRef = useRef<{ lat: number; lon: number; timestamp: number } | null>(null);
+  const consecutiveTransitCountRef = useRef<number>(0);
   const lastSpeedRef = useRef<number>(0);
   const watchIdRef = useRef<number | null>(null);
   const onCoordsChangeRef = useRef(options?.onCoordsChange);
@@ -48,66 +50,129 @@ export function useExposureTracker(options?: UseExposureTrackerOptions) {
     }
   }, []);
 
-  // Classify physical activity mode based on real-time speed
+  // Classify physical activity mode based on real-time speed and stability
   const detectAutoActivity = useCallback((speedMps?: number | null): { factor: number; label: string } => {
-    if (speedMps === null || speedMps === undefined || isNaN(speedMps) || speedMps < 0.5) {
+    if (speedMps === null || speedMps === undefined || isNaN(speedMps) || speedMps < 0.6) {
+      consecutiveTransitCountRef.current = 0;
       return { factor: 1.0, label: "Rest" };
     }
+
     // High speed (> 6.0 m/s or > 21.6 km/h) -> In Vehicle / Transit
+    // Requires sustained confirmation across at least 2 readings to avoid single-spike GPS drift
     if (speedMps > 6.0) {
-      return { factor: 1.1, label: "Transit" };
+      consecutiveTransitCountRef.current += 1;
+      if (consecutiveTransitCountRef.current >= 2) {
+        return { factor: 1.1, label: "Transit" };
+      }
+      return { factor: 1.8, label: "Walking" };
     }
+
+    consecutiveTransitCountRef.current = 0;
+
     // Moderate-high speed (2.5 to 6.0 m/s, ~9 to 21.6 km/h) -> Running / Jogging
     if (speedMps > 2.5) {
       return { factor: 3.5, label: "Running" };
     }
-    // Moderate speed (0.5 to 2.5 m/s, ~1.8 to 9 km/h) -> Walking
+
+    // Moderate speed (0.6 to 2.5 m/s, ~2.2 to 9 km/h) -> Walking
     return { factor: 1.8, label: "Walking" };
   }, []);
 
-  // Compute speed from hardware GPS or fallback displacement (meters / second)
+  // Compute speed from hardware GPS or fallback displacement (meters / second) with stationary drift protection
   const calculateMotionSpeed = useCallback(
     (
-      coords: { latitude: number; longitude: number; speed?: number | null },
+      coords: { latitude: number; longitude: number; speed?: number | null; accuracy?: number | null },
       timestamp: number = Date.now()
     ): number => {
-      let speed = coords.speed;
+      const accuracy = coords.accuracy ?? 20;
+      const rawSpeed = coords.speed;
 
-      // If browser provides a valid positive speed, use it directly
-      if (speed !== null && speed !== undefined && !isNaN(speed) && speed > 0) {
-        lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
-        lastSpeedRef.current = speed;
-        return speed;
-      }
-
-      // Fallback: calculate displacement speed from Haversine distance
-      if (lastCoordsRef.current) {
-        const distKm = calculateHaversineDistance(
-          coords.latitude,
-          coords.longitude,
-          lastCoordsRef.current.lat,
-          lastCoordsRef.current.lon
-        );
-        const timeDeltaSec = (timestamp - lastCoordsRef.current.timestamp) / 1000;
-
-        if (timeDeltaSec >= 1) {
-          const distMeters = distKm * 1000;
-          // Filter minor GPS drift/jitter (< 2 meters)
-          if (distMeters >= 2.0) {
-            speed = distMeters / timeDeltaSec;
-          } else {
-            speed = 0;
-          }
+      // 1. If hardware GPS provides explicit speed
+      if (rawSpeed !== null && rawSpeed !== undefined && !isNaN(rawSpeed) && rawSpeed >= 0) {
+        // If speed is below 0.6 m/s (~2.2 km/h), user is stationary/resting
+        if (rawSpeed < 0.6) {
           lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
-          lastSpeedRef.current = speed;
-          return speed;
+          lastSpeedRef.current = 0;
+          consecutiveTransitCountRef.current = 0;
+          stationaryAnchorRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+          return 0;
         }
-        return lastSpeedRef.current;
+        lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+        lastSpeedRef.current = rawSpeed;
+        return rawSpeed;
       }
 
-      lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
-      lastSpeedRef.current = 0;
-      return 0;
+      // 2. Fallback: calculate displacement speed from Haversine distance
+      if (!lastCoordsRef.current) {
+        lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+        stationaryAnchorRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+        lastSpeedRef.current = 0;
+        consecutiveTransitCountRef.current = 0;
+        return 0;
+      }
+
+      // Anchor-based stationary check:
+      // Geolocation indoors or at rest drifts up to max(22m, accuracy * 0.75)
+      if (stationaryAnchorRef.current) {
+        const anchorDistMeters =
+          calculateHaversineDistance(
+            coords.latitude,
+            coords.longitude,
+            stationaryAnchorRef.current.lat,
+            stationaryAnchorRef.current.lon
+          ) * 1000;
+
+        const jitterDeadband = Math.max(22.0, accuracy * 0.75);
+        if (anchorDistMeters < jitterDeadband) {
+          // Inside stationary noise radius -> user is resting in place
+          lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+          lastSpeedRef.current = 0;
+          consecutiveTransitCountRef.current = 0;
+          return 0;
+        }
+      }
+
+      const distKm = calculateHaversineDistance(
+        coords.latitude,
+        coords.longitude,
+        lastCoordsRef.current.lat,
+        lastCoordsRef.current.lon
+      );
+      const timeDeltaSec = (timestamp - lastCoordsRef.current.timestamp) / 1000;
+
+      // Require at least 2.0 seconds between points to compute reliable velocity
+      if (timeDeltaSec >= 2.0) {
+        const distMeters = distKm * 1000;
+        const minMoveThreshold = Math.max(12.0, accuracy * 0.5);
+
+        let calculatedSpeed = 0;
+        if (distMeters >= minMoveThreshold) {
+          calculatedSpeed = distMeters / timeDeltaSec;
+          // Filter out network hop / GPS teleport glitches (> 40 m/s = 144 km/h)
+          if (calculatedSpeed > 40.0) {
+            calculatedSpeed = 0;
+          }
+        }
+
+        // Exponential smoothing filter to prevent single-sample spikes
+        const smoothedSpeed =
+          lastSpeedRef.current > 0
+            ? 0.45 * calculatedSpeed + 0.55 * lastSpeedRef.current
+            : calculatedSpeed;
+
+        const finalSpeed = smoothedSpeed < 0.6 ? 0 : smoothedSpeed;
+
+        if (finalSpeed === 0) {
+          stationaryAnchorRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+          consecutiveTransitCountRef.current = 0;
+        }
+
+        lastCoordsRef.current = { lat: coords.latitude, lon: coords.longitude, timestamp };
+        lastSpeedRef.current = finalSpeed;
+        return finalSpeed;
+      }
+
+      return lastSpeedRef.current;
     },
     []
   );
@@ -315,14 +380,17 @@ export function useExposureTracker(options?: UseExposureTrackerOptions) {
           motionCount = 0;
           totalMagnitude = 0;
 
-          // If GPS reports stationary (< 0.5 m/s), check accelerometer
-          if (lastSpeedRef.current < 0.5) {
+          // If GPS reports stationary (< 0.6 m/s), check accelerometer
+          if (lastSpeedRef.current < 0.6) {
             if (avgMag > 4.5) {
               setAutoDetectedLabel("Running");
               setBreathingFactor(3.5);
             } else if (avgMag > 1.2) {
               setAutoDetectedLabel("Walking");
               setBreathingFactor(1.8);
+            } else if (avgMag < 0.6) {
+              setAutoDetectedLabel("Rest");
+              setBreathingFactor(1.0);
             }
           }
         }

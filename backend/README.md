@@ -107,9 +107,10 @@ docker ps
 docker logs -f airdose-backend
 ```
 
-- **Health Check Endpoint**: `http://localhost:8000/api/health`
-- **Swagger Documentation**: `http://localhost:8000/docs`
+- **Production HTTPS App**: `https://airdose.13.127.17.69.sslip.io`
+- **Health Check Endpoint**: `https://airdose.13.127.17.69.sslip.io/api/health`
+- **Swagger Documentation**: `https://airdose.13.127.17.69.sslip.io/docs`
 
-```
+```bash
 ssh -i "airdose-ec2-key.pem" ubuntu@13.127.17.69 "bash /home/ubuntu/AirDose/deploy.sh"
 ```
