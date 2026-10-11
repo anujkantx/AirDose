@@ -25,11 +25,12 @@ class TestApiRoutes(unittest.TestCase):
         cls.client = TestClient(app)
 
     def test_health_endpoint(self):
-        res = self.client.get("/health")
-        self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertEqual(data["status"], "ok")
-        self.assertEqual(data["database"], "sqlite3")
+        for path in ("/api/health", "/health"):
+            res = self.client.get(path)
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertEqual(data["status"], "ok")
+            self.assertEqual(data["database"], "sqlite3")
 
     def test_auth_and_locations_flow(self):
         # 1. Sign up a new user

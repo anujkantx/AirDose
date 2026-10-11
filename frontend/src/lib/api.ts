@@ -35,7 +35,7 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export async function checkBackendHealth(): Promise<{ status: string; database: string }> {
-  const res = await fetch(`${API_BASE}/health`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE}/api/health`, { cache: "no-store" });
   if (!res.ok) throw new Error("Backend connection failed");
   return res.json();
 }

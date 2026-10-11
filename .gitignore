@@ -5,6 +5,8 @@
 *.env
 *.env.production
 *.env.development
+*.pem
+public-ip.txt
 
 # Database & SQLite files (Never commit user databases!)
 *.db

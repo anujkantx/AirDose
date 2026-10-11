@@ -41,7 +41,8 @@ app.include_router(air_quality.router)
 app.include_router(exposure.router)
 
 
-@app.get("/health", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
+@app.get("/health", tags=["Health"], include_in_schema=False)
 def health():
     """Service health check endpoint."""
     return {

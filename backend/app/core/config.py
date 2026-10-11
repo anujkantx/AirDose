@@ -15,7 +15,7 @@ class Settings:
 
     # Project Metadata
     PROJECT_NAME: str = "AirDose API"
-    VERSION: str = "1.0.0"
+    VERSION: str = "2.0.0"
     DESCRIPTION: str = "Personal Air Pollution Exposure Tracking & Location Intelligence Backend"
 
     # Server Configuration
