@@ -31,7 +31,20 @@ class Settings:
 
     # AWS & Amazon Bedrock Configuration
     AWS_REGION: str = os.getenv("AWS_REGION", "ap-south-1").strip()
-    BEDROCK_MODEL_ID: str = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-micro-v1:0").strip()
+    BEDROCK_API_KEY: str = (
+        os.getenv("BEDROCK_API_KEY", "")
+        or os.getenv("AWS_BEDROCK_API_KEY", "")
+        or os.getenv("AWS_BEARER_TOKEN_BEDROCK", "")
+    ).strip()
+    BEDROCK_ENDPOINT_URL: str = os.getenv("BEDROCK_ENDPOINT_URL", "").strip()
+    BEDROCK_MODEL_ID: str = os.getenv(
+        "BEDROCK_MODEL_ID",
+        "mistral.ministral-3-3b-instruct" if (
+            os.getenv("BEDROCK_API_KEY", "")
+            or os.getenv("AWS_BEDROCK_API_KEY", "")
+            or os.getenv("AWS_BEARER_TOKEN_BEDROCK", "")
+        ) else "amazon.nova-micro-v1:0"
+    ).strip()
     BEDROCK_MAX_TOKENS: int = int(os.getenv("BEDROCK_MAX_TOKENS", "500"))
     BEDROCK_TEMPERATURE: float = float(os.getenv("BEDROCK_TEMPERATURE", "0.3"))
     BEDROCK_TIMEOUT_SECONDS: int = int(os.getenv("BEDROCK_TIMEOUT_SECONDS", "15"))

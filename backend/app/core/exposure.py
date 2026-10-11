@@ -24,8 +24,11 @@ from app.core.constants import (
 # Berkeley Earth: 22 µg/m³ for 24h (~20 µg PM2.5 absorbed) corresponds to ~1 cigarette smoke particulate burden.
 UG_PER_CIGARETTE: float = 20.0
 
-# WHO 2021 air quality guideline for PM2.5 is 15 µg/m³ 24h mean.
-# For standard resting/active respiration (~8-10 m³/day with 0.5 indoor retention), safe threshold is ~25.0 µg/day.
+# Illustrative daily reference benchmark:
+# WHO 2021 air quality guidelines specify ambient particulate concentration (15 µg/m³ 24h mean),
+# not an official clinical individual dose limit.
+# For reference tracking, 25.0 µg/day serves as an illustrative daily inhaled-dose baseline
+# under typical resting/indoor breathing conditions compliant with clean air standards.
 WHO_DAILY_RECOMMENDED_DOSE_UG: float = 25.0
 
 
@@ -67,22 +70,22 @@ def calculate_cigarette_equivalent(total_exposure_ug: float) -> float:
 
 
 def calculate_who_guideline_metrics(total_exposure_ug: float) -> Dict[str, Any]:
-    """Calculates compliance metrics relative to the WHO daily PM2.5 benchmark."""
+    """Calculates progress metrics relative to the illustrative daily WHO-derived reference benchmark."""
     safe_exposure = max(0.0, float(total_exposure_ug))
     pct = round((safe_exposure / WHO_DAILY_RECOMMENDED_DOSE_UG) * 100.0, 1)
 
     if pct <= 50.0:
         status = "EXCELLENT"
-        message = "Well within WHO clean air guidelines."
+        message = "Well within illustrative daily benchmark derived from clean air guidelines."
     elif pct <= 100.0:
         status = "MODERATE"
-        message = "Approaching daily WHO recommended exposure cap."
+        message = "Approaching illustrative daily reference benchmark."
     elif pct <= 200.0:
         status = "ELEVATED"
-        message = "Exceeded WHO daily threshold. Prioritize filtered environments."
+        message = "Above illustrative daily reference benchmark. Prioritize filtered environments."
     else:
         status = "HAZARDOUS"
-        message = "Severe particulate exposure. Wear N95 and use high HEPA filtration."
+        message = "High particulate inhalation. Wear N95 and use high HEPA filtration."
 
     return {
         "who_daily_limit_ug": WHO_DAILY_RECOMMENDED_DOSE_UG,

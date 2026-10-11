@@ -24,7 +24,8 @@ from app.schemas.ai import (
     ExplainExposureRequest,
 )
 from app.services.ai_advisor_service import ai_advisor_service
-from app.services.bedrock_service import BedrockService
+from app.services.bedrock_service import bedrock_service, BedrockService
+from app.core.config import settings
 
 
 class TestAiAdvisor(unittest.TestCase):
@@ -33,6 +34,16 @@ class TestAiAdvisor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client = TestClient(app)
+
+    def setUp(self):
+        self._orig_api_key = settings.BEDROCK_API_KEY
+        self._orig_singleton_key = bedrock_service._api_key
+        settings.BEDROCK_API_KEY = ""
+        bedrock_service._api_key = ""
+
+    def tearDown(self):
+        settings.BEDROCK_API_KEY = self._orig_api_key
+        bedrock_service._api_key = self._orig_singleton_key
 
     def test_status_endpoint(self):
         """Validates that GET /api/ai/status returns valid Bedrock configuration."""
@@ -263,6 +274,32 @@ class TestAiAdvisor(unittest.TestCase):
             json={"message": "Valid prompt", "context": {"concentration": -50.0}},
         )
         self.assertEqual(res2.status_code, 422)
+
+    @patch("httpx.Client.post")
+    def test_bedrock_api_key_invocation(self, mock_post):
+        """Verifies that when BEDROCK_API_KEY is configured, BedrockService invokes via HTTP bearer token."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "model": "mistral.ministral-3-3b-instruct",
+            "choices": [{
+                "message": {"content": "Your PM2.5 exposure is moderate. Wear an N95 mask outdoors."},
+                "finish_reason": "stop"
+            }],
+            "usage": {"prompt_tokens": 50, "completion_tokens": 15, "total_tokens": 65}
+        }
+        mock_post.return_value = mock_response
+
+        settings.BEDROCK_API_KEY = "ABSKmocked_test_key"
+        service = BedrockService()
+        success, text, meta = service.invoke_converse(
+            messages=[{"role": "user", "content": "How is my air exposure?"}]
+        )
+
+        self.assertTrue(success)
+        self.assertIn("Wear an N95 mask", text)
+        self.assertEqual(meta["model_provider"], "amazon-bedrock")
+        self.assertEqual(meta["model_id"], "mistral.ministral-3-3b-instruct")
 
 
 if __name__ == "__main__":

@@ -5,14 +5,11 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import TodayExposureHero from "@/components/dashboard/TodayExposureHero";
-import ExposureContributionCard from "@/components/dashboard/ExposureContributionCard";
 import ExposureHistoryChart from "@/components/dashboard/ExposureHistoryChart";
-import { AiAdvisorModal, BreatheImpactVisualizer } from "@/components/dashboard";
+import { AiAdvisorModal } from "@/components/dashboard";
 import AirQualityHero from "@/components/air-quality/AirQualityHero";
 import PollutantGrid from "@/components/air-quality/PollutantGrid";
 import StationInfoCard from "@/components/air-quality/StationInfoCard";
-import CleanAirAdvisoryCard from "@/components/air-quality/CleanAirAdvisoryCard";
-import CurrentLocationCard from "@/components/locations/CurrentLocationCard";
 import { useExposureTracker } from "@/hooks";
 import {
   getStoredUser,
@@ -168,12 +165,14 @@ export default function DashboardPage() {
 
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => {
                   loadAirQuality(userCoords.lat, userCoords.lon, true);
                   loadExposureSummary();
                 }}
                 disabled={refreshing}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-full transition-all shadow-xs"
+                aria-label="Refresh air quality and exposure data"
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-full transition-all shadow-xs cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-blue-600" : ""}`} />
                 <span>{refreshing ? "Syncing..." : "Refresh Matrix"}</span>
@@ -201,40 +200,18 @@ export default function DashboardPage() {
             }}
           />
 
-          {/* 1.5 BREATHE IMPACT — Interactive Pulmonary Dosimetry Visualizer */}
-          <BreatheImpactVisualizer
-            pm25={airData?.pollutants?.pm25?.value ?? (exposureData?.current?.pm25 ?? 75.0)}
-            aqi={airData?.aqi}
-            breathingFactor={breathingFactor}
-            activityLabel={isAutoMode ? autoDetectedLabel : breathingFactor >= 3.0 ? "Running" : breathingFactor >= 1.5 ? "Walking" : "Rest"}
-            locationName={airData?.station?.name || "Current Location"}
-            dataSource={airData?.is_cached ? "cached" : airData?.status === "LIVE" ? "live" : "demo"}
-            totalAccumulatedUg={exposureData?.total_exposure_ug}
-            isTracking={isTracking}
-            onOpenAiAdvisor={(mode = "chat") => {
-              setAiAdvisorMode(mode);
-              setAiAdvisorOpen(true);
-            }}
-          />
-
-          {/* 2. Exposure Insights: Micro-Environment Breakdown, Historical Inhalation Log & Health Advisory */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <ExposureContributionCard
-              contributions={exposureData?.contributions || {}}
-              totalExposureUg={exposureData?.total_exposure_ug || 0}
-            />
-            <ExposureHistoryChart todayExposureUg={exposureData?.total_exposure_ug} />
-            <CleanAirAdvisoryCard airData={airData} exposureData={exposureData} />
-          </div>
-
-          {/* 3. Hero Air Quality & AQI Matrix */}
+          {/* TIER 2: Current Air Quality & Actionable Protection (Questions 2 & 3) */}
+          {/* US-EPA Air Quality Index, Dominant Pollutant, Standardized Action Pills, and Route Simulation CTA */}
           <AirQualityHero data={airData} loading={refreshing && !airData} />
 
-          {/* 4. Real-time Pollutant Matrix (PM2.5, PM10, NO2, O3, CO, SO2) */}
-          <PollutantGrid data={airData} loading={refreshing && !airData} />
-
-          {/* 5. Monitoring Station & Live GPS Telemetry */}
+          {/* TIER 3: History & Scientific Grounding (Question 4 & Environmental Ground Truth) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* 7-Day Inhalation History Analytics (Spacious 2/3 width) */}
+            <div className="lg:col-span-2">
+              <ExposureHistoryChart todayExposureUg={exposureData?.total_exposure_ug} />
+            </div>
+
+            {/* Monitoring Station Context (1/3 width) */}
             <div className="lg:col-span-1">
               <StationInfoCard
                 station={airData?.station}
@@ -242,13 +219,10 @@ export default function DashboardPage() {
                 humidity={airData?.pollutants?.humidity}
               />
             </div>
-            <div className="lg:col-span-2">
-              <CurrentLocationCard
-                userId={user?.id}
-                onLocationSaved={recordCurrentTick}
-              />
-            </div>
           </div>
+
+          {/* TIER 3 Extension: Secondary Criteria Pollutants Matrix (6-Sensor Telemetry Matrix) */}
+          <PollutantGrid data={airData} loading={refreshing && !airData} />
         </main>
 
         {/* Footer */}

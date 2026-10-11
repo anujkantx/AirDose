@@ -162,6 +162,8 @@ export interface AirQualityStation {
   latitude: number;
   longitude: number;
   last_updated?: string;
+  confidence?: string;
+  selection_score?: number;
 }
 
 export interface AirQualityData {

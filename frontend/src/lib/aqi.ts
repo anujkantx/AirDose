@@ -10,6 +10,10 @@ export interface AqiInfo {
   recommendation: string;
   mask_needed: boolean;
   purifier_needed: boolean;
+  cardio_advice: string;
+  cardio_warning: boolean;
+  windows_advice: string;
+  windows_warning: boolean;
   color: string; // Hex color for canvas / charts
   badgeClass: string; // Tailwind CSS classes for badges
   dotClass: string;
@@ -17,8 +21,26 @@ export interface AqiInfo {
   textColor: string;
 }
 
-export function getAqiCategory(aqi: number): AqiInfo {
-  if (aqi <= 50) {
+export function getAqiCategory(aqi: number | null | undefined): AqiInfo {
+  if (aqi === null || aqi === undefined || isNaN(aqi) || aqi < 0) {
+    return {
+      level: "Unavailable",
+      category: "Data Unavailable",
+      description: "Air quality index is currently unavailable for this station.",
+      recommendation: "Awaiting local sensor telemetry or station update.",
+      mask_needed: false,
+      purifier_needed: false,
+      cardio_advice: "No Data",
+      cardio_warning: false,
+      windows_advice: "No Data",
+      windows_warning: false,
+      color: "#94a3b8",
+      badgeClass: "bg-slate-100 text-slate-600 border-slate-200",
+      dotClass: "bg-slate-400",
+      bgLight: "bg-slate-50",
+      textColor: "text-slate-600",
+    };
+  } else if (aqi <= 50) {
     return {
       level: "Good",
       category: "Good",
@@ -26,6 +48,10 @@ export function getAqiCategory(aqi: number): AqiInfo {
       recommendation: "Ideal air quality for outdoor workouts, cycling, and opening windows.",
       mask_needed: false,
       purifier_needed: false,
+      cardio_advice: "Outdoor Safe",
+      cardio_warning: false,
+      windows_advice: "Safe to Open",
+      windows_warning: false,
       color: "#10b981",
       badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
       dotClass: "bg-emerald-500",
@@ -40,6 +66,10 @@ export function getAqiCategory(aqi: number): AqiInfo {
       recommendation: "Unusually sensitive people should consider reducing prolonged outdoor exertion.",
       mask_needed: false,
       purifier_needed: false,
+      cardio_advice: "Normal for Most",
+      cardio_warning: false,
+      windows_advice: "Moderate Air",
+      windows_warning: false,
       color: "#eab308",
       badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
       dotClass: "bg-amber-500",
@@ -54,6 +84,10 @@ export function getAqiCategory(aqi: number): AqiInfo {
       recommendation: "Children, the elderly, and people with respiratory or heart conditions should limit outdoor activity.",
       mask_needed: true,
       purifier_needed: true,
+      cardio_advice: "Limit Cardio",
+      cardio_warning: true,
+      windows_advice: "Keep Closed",
+      windows_warning: true,
       color: "#f97316",
       badgeClass: "bg-orange-50 text-orange-700 border-orange-200",
       dotClass: "bg-orange-500",
@@ -68,6 +102,10 @@ export function getAqiCategory(aqi: number): AqiInfo {
       recommendation: "Wear an N95 mask outdoors. Keep windows closed and run an air purifier indoors.",
       mask_needed: true,
       purifier_needed: true,
+      cardio_advice: "Avoid Exertion",
+      cardio_warning: true,
+      windows_advice: "Keep Sealed",
+      windows_warning: true,
       color: "#ef4444",
       badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
       dotClass: "bg-rose-500",
@@ -82,6 +120,10 @@ export function getAqiCategory(aqi: number): AqiInfo {
       recommendation: "Avoid outdoor strenuous activities. Keep indoor air clean with HEPA filtration.",
       mask_needed: true,
       purifier_needed: true,
+      cardio_advice: "Avoid Outdoor",
+      cardio_warning: true,
+      windows_advice: "Keep Sealed",
+      windows_warning: true,
       color: "#a855f7",
       badgeClass: "bg-purple-50 text-purple-700 border-purple-200",
       dotClass: "bg-purple-500",
@@ -96,6 +138,10 @@ export function getAqiCategory(aqi: number): AqiInfo {
       recommendation: "Remain indoors. Avoid all physical outdoor activities and seal entryways.",
       mask_needed: true,
       purifier_needed: true,
+      cardio_advice: "Stay Indoors",
+      cardio_warning: true,
+      windows_advice: "Seal Entryways",
+      windows_warning: true,
       color: "#7f1d1d",
       badgeClass: "bg-red-950/20 text-red-900 border-red-300",
       dotClass: "bg-red-800",

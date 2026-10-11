@@ -50,9 +50,11 @@ async def explain_exposure(request: ExplainExposureRequest):
 @router.get("/status")
 def get_ai_service_status() -> Dict[str, Any]:
     """Returns runtime status and configuration of Amazon Bedrock integration."""
+    has_api_key = bool(settings.BEDROCK_API_KEY)
     return {
         "status": "ready",
         "provider": "amazon-bedrock",
+        "auth_method": "bedrock-api-key" if has_api_key else "iam-credentials",
         "region": settings.AWS_REGION,
         "model_id": settings.BEDROCK_MODEL_ID,
         "max_tokens": settings.BEDROCK_MAX_TOKENS,

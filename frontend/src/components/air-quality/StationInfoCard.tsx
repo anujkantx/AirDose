@@ -14,7 +14,7 @@ export default function StationInfoCard({ station, temperature, humidity }: Stat
   if (!station) return null;
 
   return (
-    <div className="bg-white rounded-[26px] p-6 shadow-soft border border-slate-200/80 flex flex-col justify-between h-full">
+    <div className="bg-white rounded-3xl p-6 shadow-soft border border-slate-200/80 flex flex-col justify-between h-full">
       <div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
@@ -28,15 +28,25 @@ export default function StationInfoCard({ station, temperature, humidity }: Stat
               <p className="text-[11px] text-slate-500 font-medium">OpenAQ Sensor Node</p>
             </div>
           </div>
-          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-            <ShieldCheck className="w-3 h-3" /> Live
-          </span>
+          {station.confidence === "demo" ? (
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" /> Demo
+            </span>
+          ) : station.confidence === "fallback" ? (
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" /> Fallback
+            </span>
+          ) : (
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" /> Connected
+            </span>
+          )}
         </div>
 
         <div className="space-y-3">
           {/* Station Name Box */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100">
-            <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mb-1">
+            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider block mb-1">
               Station Identifier
             </span>
             <p className="text-xs font-bold text-slate-800 leading-snug">{station.name}</p>
@@ -49,20 +59,22 @@ export default function StationInfoCard({ station, temperature, humidity }: Stat
           {/* Telemetry Matrix Grid */}
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-400 font-medium block">Distance</span>
+              <span className="text-[10px] text-slate-500 font-medium block">Distance</span>
               <span className="font-bold text-slate-900 text-sm font-mono mt-0.5 block">{station.distance_km} km</span>
             </div>
 
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-400 font-medium block">Precision</span>
-              <span className="font-bold text-emerald-600 text-xs flex items-center gap-1 mt-1 font-mono">
-                High Latency
-              </span>
-            </div>
+            {station.confidence && (
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] text-slate-500 font-medium block">Match Confidence</span>
+                <span className="font-bold text-slate-800 text-xs capitalize flex items-center gap-1 mt-1 font-mono">
+                  {station.confidence}
+                </span>
+              </div>
+            )}
 
             {temperature?.value !== undefined && (
               <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
                   <Thermometer className="w-3 h-3 text-amber-500" /> Temp
                 </span>
                 <span className="font-bold text-slate-900 text-sm font-mono mt-0.5 block">{temperature.value}°C</span>
@@ -71,7 +83,7 @@ export default function StationInfoCard({ station, temperature, humidity }: Stat
 
             {humidity?.value !== undefined && (
               <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
                   <Droplets className="w-3 h-3 text-sky-500" /> Humidity
                 </span>
                 <span className="font-bold text-slate-900 text-sm font-mono mt-0.5 block">{humidity.value}%</span>
@@ -83,8 +95,8 @@ export default function StationInfoCard({ station, temperature, humidity }: Stat
 
       {/* Footer */}
       <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
-        <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-          <Clock className="w-3 h-3" /> {station.last_updated || "Realtime"}
+        <span className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+          <Clock className="w-3 h-3 text-slate-400" /> {station.last_updated || "Timestamp unavailable"}
         </span>
         <a
           href={`https://maps.google.com/?q=${station.latitude},${station.longitude}`}

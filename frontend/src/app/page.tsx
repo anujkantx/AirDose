@@ -389,13 +389,13 @@ export default function Home() {
                   <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
                     <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1 mb-1">
                       <HeartPulse className="w-3.5 h-3.5 text-blue-500" />
-                      WHO 24h Cap
+                      WHO Guideline Ref
                     </span>
                     <div className={`text-2xl font-black font-mono ${whoPct > 100 ? "text-rose-600" : "text-emerald-600"}`}>
                       {whoPct}%
                     </div>
                     <span className="text-[10px] text-slate-500 block mt-0.5">
-                      Daily safe limit: 25.0 μg
+                      Illustrative 24h ref: 25.0 μg*
                     </span>
                   </div>
                 </div>

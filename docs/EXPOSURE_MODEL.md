@@ -84,8 +84,15 @@ Developed by Richard & Elizabeth Muller at UC Berkeley, calibrating inhaled $\te
 
 $$\text{Cigarettes} \approx \frac{\text{Total Inhaled Dose } (\mu\text{g})}{20.0\,\mu\text{g}}$$
 
-### WHO Daily Cap Reference
-The World Health Organization (WHO) air quality guidelines recommend a 24-hour ambient mean of $\le 25\,\mu\text{g/m}^3$. At basal resting ventilation ($0.0001\text{ m}^3\text{/s} \times 86,400\text{ s} = 8.64\text{ m}^3\text{/day}$), this represents an inhaled daily baseline threshold of $\approx 216\,\mu\text{g/day}$. AirDose tracks personal progress against this daily cap.
+### WHO Guideline Reference Metric
+**Scientific Clarification: Ambient Concentration vs. Inhaled Mass**
+The World Health Organization (WHO) Air Quality Guidelines (AQGs, 2021) specify ambient particulate concentration targets (e.g., $15\,\mu\text{g/m}^3$ 24-hour mean, $5\,\mu\text{g/m}^3$ annual mean). The WHO does **not** establish a personal daily inhaled mass dose limit or clinical daily exposure cap.
+
+**Illustrative Reference Benchmark ($25.0\,\mu\text{g}$)**
+In AirDose, the constant `WHO_DAILY_RECOMMENDED_DOSE_UG = 25.0` is used as an **illustrative reference benchmark** for relative dosimetric tracking:
+- Under typical clean indoor environments with realistic infiltration ($I_f \approx 0.2 - 0.4$) compliant with WHO ambient air quality guidelines, an adult's resting 24-hour inhaled particulate mass approximates $20 - 30\,\mu\text{g}$.
+- Hypothetical unshielded 24-hour outdoor immersion at former ambient interim targets ($25\,\mu\text{g/m}^3$) yields $\approx 216\,\mu\text{g/day}$ ($0.0001\text{ m}^3\text{/s} \times 86,400\text{ s} \times 25\,\mu\text{g/m}^3$), which represents heavy ambient exposure rather than a personal health target.
+- Therefore, the $25.0\,\mu\text{g}$ daily metric serves purely as an illustrative comparative reference baseline for tracking daily dose accumulation, rather than a clinical threshold. All UI displays and API messages explicitly label this metric as a derived illustrative guideline reference.
 
 ---
 

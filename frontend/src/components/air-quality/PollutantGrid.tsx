@@ -8,8 +8,6 @@ import {
   Zap,
   Activity,
   Droplets,
-  ShieldCheck,
-  AlertTriangle,
 } from "lucide-react";
 import { AirQualityData, PollutantDetail } from "@/lib/api";
 
@@ -93,6 +91,7 @@ const POLLUTANTS_CONFIG: PollutantConfig[] = [
 ];
 
 export default function PollutantGrid({ data, loading }: PollutantGridProps) {
+
   if (loading || !data) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 animate-pulse">
@@ -158,23 +157,32 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            Pollutant Telemetry Matrix
-          </h3>
-          <span className="text-xs text-slate-500 font-medium">
-            Live OpenAQ Sensors &amp; Safe Limit Utilization
-          </span>
+      {/* Section Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 px-4 bg-white rounded-2xl border border-slate-200/80 shadow-soft">
+        <div className="flex items-center gap-2.5 text-left">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
+            <Layers className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              Secondary Criteria Pollutants
+              <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full font-mono">
+                6 Sensors
+              </span>
+            </h3>
+            <p className="text-[11px] text-slate-500 font-medium">
+              Ground readings for PM₁₀, NO₂, O₃, CO, SO₂ &amp; EPA safe limit utilization
+            </p>
+          </div>
         </div>
 
         {/* Time-Bound Spatio-Temporal Cache Info Badge */}
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono font-semibold text-slate-700 bg-white border border-slate-200/80 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-soft">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <span className="text-[11px] font-mono font-semibold text-slate-700 bg-slate-50 border border-slate-200/80 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
             <span className={`w-1.5 h-1.5 rounded-full ${data.is_cached ? "bg-blue-500" : "bg-emerald-500 animate-pulse"}`} />
             <span>
               {data.is_cached
-                ? `Cached (${data.cache_distance_meters ? `${data.cache_distance_meters}m` : "<1km"} • ${data.cached_at_display || "Recent"})`
+                ? `Cached (${data.cache_distance_meters ? `${data.cache_distance_meters}m` : "<1km"})`
                 : `Live Fetch (${data.fetched_at_display || "Just now"})`}
             </span>
             <span className="text-slate-300">|</span>
@@ -185,7 +193,8 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+      {/* 6 Sensors Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 pt-0.5">
         {POLLUTANTS_CONFIG.map((item) => {
           const detail: PollutantDetail | undefined = pollutants[item.key];
           const rawValue = detail?.value;
@@ -259,7 +268,7 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
                   <span className="text-2xl font-black font-mono text-slate-900 tracking-tight">
                     {displayValue}
                   </span>
-                  <span className="text-[11px] text-slate-400 font-medium truncate">
+                  <span className="text-[11px] text-slate-500 font-medium truncate">
                     {unit}
                   </span>
                 </div>
@@ -270,7 +279,7 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
 
               {/* Footer: Safe Limit & Status Badge */}
               <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-400 font-medium">
+                <span className="text-slate-500 font-medium">
                   Limit <span className="font-mono font-bold text-slate-700">{item.safeLimit}</span>
                 </span>
 

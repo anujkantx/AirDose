@@ -42,50 +42,9 @@ export default function SavedLocationsTable({
       }
     } catch (err) {
       console.error("Failed to fetch locations:", err);
-      const fallback: UserLocation[] = [
-        {
-          id: 1,
-          user_id: userId || 1,
-          location_type: "home",
-          name: "Home Residence",
-          latitude: 28.6139,
-          longitude: 77.2090,
-          address: "Central Delhi, India",
-          radius_meters: 50,
-          indoor_coefficient: 0.45,
-          infiltration_factor: 0.45,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 2,
-          user_id: userId || 1,
-          location_type: "office",
-          name: "Tech Hub Office",
-          latitude: 28.4595,
-          longitude: 77.0266,
-          address: "Cyber Hub, Gurugram, India",
-          radius_meters: 50,
-          indoor_coefficient: 0.35,
-          infiltration_factor: 0.35,
-          created_at: new Date().toISOString(),
-        },
-        {
-          id: 3,
-          user_id: userId || 1,
-          location_type: "college",
-          name: "University Campus",
-          latitude: 28.5457,
-          longitude: 77.1928,
-          address: "IIT Delhi Campus, New Delhi",
-          radius_meters: 50,
-          indoor_coefficient: 0.55,
-          infiltration_factor: 0.55,
-          created_at: new Date().toISOString(),
-        },
-      ];
-      setLocations(fallback);
+      setLocations([]);
       if (onLocationsCountChange) {
-        onLocationsCountChange(fallback.length);
+        onLocationsCountChange(0);
       }
     } finally {
       setLoading(false);
@@ -242,8 +201,27 @@ export default function SavedLocationsTable({
               </tr>
             ) : filteredLocations.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-400">
-                  No places found for the selected filter.
+                <td colSpan={5} className="py-10 text-center text-slate-400">
+                  <MapPin className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-slate-600">
+                    {locations.length === 0
+                      ? "No saved places yet"
+                      : "No places found for the selected filter."}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {locations.length === 0
+                      ? "Configure Home, Office, or Campus to calibrate building infiltration factors."
+                      : "Try switching to 'All' or add a new place."}
+                  </p>
+                  {locations.length === 0 && (
+                    <button
+                      onClick={handleOpenAddModal}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-[#0062ff] hover:bg-blue-600 rounded-full transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Your First Place</span>
+                    </button>
+                  )}
                 </td>
               </tr>
             ) : (

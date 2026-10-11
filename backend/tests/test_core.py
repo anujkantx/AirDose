@@ -17,6 +17,7 @@ from app.core.exposure import (
     calculate_inhalation_rate,
     calculate_exposure_increment,
     should_close_segment,
+    calculate_who_guideline_metrics,
 )
 from app.core.aqi import (
     calculate_pm25_aqi,
@@ -88,6 +89,29 @@ class TestExposureCore(unittest.TestCase):
 
         # 3600 seconds (1 hour): 0.005 * 3600 = 18.0 µg
         self.assertAlmostEqual(calculate_exposure_increment(inhalation_rate, 3600.0), 18.0, places=6)
+
+    def test_who_guideline_metrics_calculation(self):
+        # 12.5 µg -> 50% -> EXCELLENT
+        res_excellent = calculate_who_guideline_metrics(12.5)
+        self.assertEqual(res_excellent["who_daily_limit_ug"], 25.0)
+        self.assertEqual(res_excellent["percentage_of_who_limit"], 50.0)
+        self.assertEqual(res_excellent["status"], "EXCELLENT")
+        self.assertIn("illustrative", res_excellent["message"].lower())
+
+        # 25.0 µg -> 100% -> MODERATE
+        res_mod = calculate_who_guideline_metrics(25.0)
+        self.assertEqual(res_mod["percentage_of_who_limit"], 100.0)
+        self.assertEqual(res_mod["status"], "MODERATE")
+
+        # 37.5 µg -> 150% -> ELEVATED
+        res_elevated = calculate_who_guideline_metrics(37.5)
+        self.assertEqual(res_elevated["percentage_of_who_limit"], 150.0)
+        self.assertEqual(res_elevated["status"], "ELEVATED")
+
+        # 60.0 µg -> 240% -> HAZARDOUS
+        res_haz = calculate_who_guideline_metrics(60.0)
+        self.assertEqual(res_haz["percentage_of_who_limit"], 240.0)
+        self.assertEqual(res_haz["status"], "HAZARDOUS")
 
     def test_should_close_segment_rules(self):
         # 1. Location changed

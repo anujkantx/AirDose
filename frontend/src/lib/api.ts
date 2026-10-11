@@ -1,6 +1,6 @@
 /**
  * AirDose API Client
- * Connects to SQLite FastAPI backend on http://localhost:8000
+ * Connects to AirDose FastAPI backend configured via NEXT_PUBLIC_API_URL
  */
 
 import type {
@@ -19,7 +19,7 @@ import type {
 // Re-export all domain types for backward compatibility across existing imports
 export type * from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
 
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
@@ -283,4 +283,45 @@ export function clearSession() {
   if (typeof window === "undefined") return;
   localStorage.removeItem("airdose_user");
   localStorage.removeItem("airdose_token");
+}
+
+// Amazon Bedrock AI Exposure Advisor APIs
+export async function getAiStatusApi(): Promise<import("@/types").AiStatusResponse> {
+  const res = await fetch(`${API_BASE}/api/ai/status`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error("Failed to check AI status");
+  }
+  return res.json();
+}
+
+export async function askAiAdvisor(
+  payload: import("@/types").AdvisorRequest
+): Promise<import("@/types").AdvisorResponse> {
+  const res = await fetch(`${API_BASE}/api/ai/advisor`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to get advice from Amazon Bedrock");
+  }
+  return data;
+}
+
+export async function explainExposureApi(
+  payload: import("@/types").ExplainExposureRequest
+): Promise<import("@/types").ExplainExposureResponse> {
+  const res = await fetch(`${API_BASE}/api/ai/explain-exposure`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to explain exposure");
+  }
+  return data;
 }

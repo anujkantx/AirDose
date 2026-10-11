@@ -116,19 +116,11 @@ export default function TodayExposureHero({
         if (data && data.length > 0) {
           setLocations(data);
         } else {
-          setLocations([
-            { id: 1, user_id: 1, location_type: "home", name: "Home Residence", latitude: 28.6139, longitude: 77.2090, radius_meters: 100, indoor_coefficient: 0.5, created_at: "" },
-            { id: 2, user_id: 1, location_type: "office", name: "Tech Hub Office", latitude: 28.4595, longitude: 77.0266, radius_meters: 150, indoor_coefficient: 0.4, created_at: "" },
-            { id: 3, user_id: 1, location_type: "college", name: "University Campus", latitude: 28.5457, longitude: 77.1928, radius_meters: 200, indoor_coefficient: 0.5, created_at: "" },
-          ]);
+          setLocations([]);
         }
       })
       .catch(() => {
-        setLocations([
-          { id: 1, user_id: 1, location_type: "home", name: "Home Residence", latitude: 28.6139, longitude: 77.2090, radius_meters: 100, indoor_coefficient: 0.5, created_at: "" },
-          { id: 2, user_id: 1, location_type: "office", name: "Tech Hub Office", latitude: 28.4595, longitude: 77.0266, radius_meters: 150, indoor_coefficient: 0.4, created_at: "" },
-          { id: 3, user_id: 1, location_type: "college", name: "University Campus", latitude: 28.5457, longitude: 77.1928, radius_meters: 200, indoor_coefficient: 0.5, created_at: "" },
-        ]);
+        setLocations([]);
       });
   }, [userId]);
 
@@ -162,17 +154,23 @@ export default function TodayExposureHero({
   const circumference = 2 * Math.PI * 40;
   const whoGaugeOffset = Math.max(0, circumference - Math.min(1.0, whoPercentage / 100) * circumference);
 
-  // Real-time distances to places
-  const currentLat = userCoords?.lat ?? 28.6139;
-  const currentLon = userCoords?.lon ?? 77.2090;
+  // Real-time distances to places (only when genuine GPS coordinates exist)
+  const currentLat = userCoords?.lat ?? null;
+  const currentLon = userCoords?.lon ?? null;
 
   const placesWithDist = locations.map((loc) => {
-    const dist = calculateHaversineDistance(currentLat, currentLon, loc.latitude, loc.longitude);
+    const dist = (currentLat !== null && currentLon !== null)
+      ? calculateHaversineDistance(currentLat, currentLon, loc.latitude, loc.longitude)
+      : null;
     return {
       ...loc,
       distanceMeters: dist,
     };
-  }).sort((a, b) => a.distanceMeters - b.distanceMeters);
+  }).sort((a, b) => {
+    if (a.distanceMeters === null) return 0;
+    if (b.distanceMeters === null) return 0;
+    return a.distanceMeters - b.distanceMeters;
+  });
 
   const getPlaceIcon = (type: string) => {
     switch (type.toLowerCase()) {
@@ -216,6 +214,13 @@ export default function TodayExposureHero({
 
   return (
     <div className="space-y-4">
+      {permissionDenied && (
+        <div className="flex items-center gap-2 p-2.5 px-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
+          <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+          <span>Location access was denied. Ambient exposure tracking requires location permissions to associate regional air quality stations with your real coordinates. Enable location permissions in your browser for live local tracking.</span>
+        </div>
+      )}
+
       {/* Top Controls Header: Live Telemetry Status, Exertion Selector & Commute Simulator CTA */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1 pb-1">
         {/* Left: Quick Activity Exertion Selector */}
@@ -225,8 +230,9 @@ export default function TodayExposureHero({
           <button
             type="button"
             onClick={handleToggleAuto}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${autoModeActive
-              ? "bg-[#0062ff] text-white shadow-sm shadow-blue-500/30 scale-102"
+            aria-pressed={autoModeActive}
+            className={`px-3.5 py-1.5 min-h-[34px] shrink-0 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${autoModeActive
+              ? "bg-[#0062ff] text-white shadow-xs"
               : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
               }`}
             title={
@@ -238,7 +244,7 @@ export default function TodayExposureHero({
             <Cpu className="w-3.5 h-3.5" />
             <span>Auto</span>
             {autoModeActive ? (
-              <span className="text-[10px] font-mono bg-white/20 px-1.5 py-0.2 rounded-full font-bold">
+              <span className="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
                 {autoDetectedLabel} {selectedBreathingFactor.toFixed(1)}x
               </span>
             ) : (
@@ -254,13 +260,14 @@ export default function TodayExposureHero({
               <button
                 key={act.factor}
                 type="button"
+                aria-pressed={isSelected}
                 onClick={() => {
                   setInternalAutoMode(false);
                   onAutoModeChange?.(false);
                   onBreathingFactorChange(act.factor);
                 }}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${isSelected
-                  ? "bg-[#0062ff] text-white shadow-sm shadow-blue-500/30 scale-102"
+                className={`px-3.5 py-1.5 min-h-[34px] shrink-0 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${isSelected
+                  ? "bg-[#0062ff] text-white shadow-xs"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                   }`}
               >
@@ -282,8 +289,9 @@ export default function TodayExposureHero({
 
           {/* Pause / Play Button */}
           <button
+            type="button"
             onClick={onToggleTracking}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 ${isTracking
+            className={`px-4 py-2 min-h-[36px] rounded-full text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${isTracking
               ? "bg-slate-900 hover:bg-slate-800 text-white"
               : "bg-[#0062ff] hover:bg-blue-600 text-white shadow-blue-500/25"
               }`}
@@ -306,102 +314,86 @@ export default function TodayExposureHero({
       {/* Grid: 3 Hero Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4">
 
-        {/* Card 1: Live PM2.5 Dosimeter */}
-        <div className="lg:col-span-4 bg-white text-slate-900 rounded-[28px] p-6 shadow-soft border border-slate-200/80 flex flex-col justify-between relative overflow-hidden">
-          {/* Subtle Dynamic Ambient Pulse Glow */}
-          <div
-            className={`absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10 transition-all duration-700 ${isTracking ? "bg-blue-500/10" : "bg-slate-200/20"
-              }`}
-          />
-
+        {/* Card 1: Inhaled PM2.5 Dosimeter */}
+        <div className="lg:col-span-4 bg-white text-slate-900 rounded-3xl p-6 shadow-soft border border-slate-200/80 flex flex-col justify-between relative overflow-hidden">
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-[#0062ff] flex items-center gap-1.5">
-                <HeartPulse className="w-4 h-4 text-[#0062ff]" />
-                Live Inhalation Dosimeter
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <HeartPulse className="w-4 h-4 text-blue-600" />
+                Inhaled PM₂.₅ Mass
               </span>
               <button
+                type="button"
                 onClick={() => setIsFormulaModalOpen(true)}
-                className="text-slate-400 hover:text-slate-700 p-1 transition-colors"
-                title="View mathematical kinetics"
+                className="text-slate-400 hover:text-slate-700 p-1 transition-colors cursor-pointer"
+                title="View inhalation calculation formula"
               >
                 <Info className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex items-center gap-5 my-2">
-              {/* Radial Gauge with Real-time Breath Pulsing */}
-              <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96">
-                  <circle
-                    cx="48"
-                    cy="48"
-                    r="40"
-                    stroke="#f1f5f9"
-                    strokeWidth="9"
-                    fill="transparent"
-                  />
-                  <circle
-                    cx="48"
-                    cy="48"
-                    r="40"
-                    stroke={whoPercentage > 100 ? "#f43f5e" : whoPercentage > 75 ? "#f59e0b" : "#0062ff"}
-                    strokeWidth="9"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={whoGaugeOffset}
-                    strokeLinecap="round"
-                    fill="transparent"
-                    className="transition-all duration-700 ease-out"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black text-slate-900 font-mono tracking-tight leading-none">
-                    {liveDisplayExposure.toFixed(1)}
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-400 mt-0.5">μg PM₂.₅</span>
-                </div>
+            {/* Primary Cumulative Exposure Metric */}
+            <div className="my-2.5">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl sm:text-5xl font-black text-slate-900 font-mono tracking-tight leading-none">
+                  {liveDisplayExposure.toFixed(1)}
+                </span>
+                <span className="text-base sm:text-lg font-bold font-mono text-slate-500">
+                  μg PM₂.₅
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1.5 font-medium">
+                Estimated personal inhaled particulate mass today
+              </p>
+            </div>
+
+            {/* Health Equivalence & WHO Benchmark Group */}
+            <div className="space-y-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-600 font-medium">WHO Guideline Ref:</span>
+                <span
+                  className={`text-xs font-bold font-mono px-2.5 py-0.5 rounded-full border ${whoPercentage <= 50
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : whoPercentage <= 100
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-rose-50 text-rose-700 border-rose-200"
+                    }`}
+                >
+                  {whoPercentage}% of ref
+                </span>
               </div>
 
-              {/* Shock-Value Health Benchmarks */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 font-medium">Cigarette Impact:</span>
-                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-black font-mono px-2 py-0.5 rounded-full">
-                    <Cigarette className="w-3 h-3 text-amber-600" />
-                    ~{liveCigarettes} cigs
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 font-medium">WHO 24h Cap:</span>
-                  <span
-                    className={`text-xs font-black font-mono px-2 py-0.5 rounded-full ${whoPercentage <= 50
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : whoPercentage <= 100
-                        ? "bg-amber-50 text-amber-700 border border-amber-200"
-                        : "bg-rose-50 text-rose-700 border border-rose-200"
-                      }`}
-                  >
-                    {whoPercentage}% of limit
-                  </span>
-                </div>
-
-                <div className="pt-1">
-                  <span className="text-[10px] text-slate-400">
-                    Berkeley Earth standard: 20 µg PM2.5 ≈ 1 cigarette dose.
-                  </span>
-                </div>
+              {/* Subordinate Benchmark Progress Indicator */}
+              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  style={{ width: `${Math.min(100, Math.max(2, whoPercentage))}%` }}
+                  className={`h-full rounded-full transition-all duration-700 ${
+                    whoPercentage > 100 ? "bg-rose-500" : whoPercentage > 75 ? "bg-amber-500" : "bg-blue-600"
+                  }`}
+                />
               </div>
+
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-slate-600 font-medium">Particulate Equivalence:</span>
+                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold font-mono px-2 py-0.5 rounded-full">
+                  <Cigarette className="w-3 h-3 text-amber-600" />
+                  ~{liveCigarettes} cigs
+                </span>
+              </div>
+
+              <p className="text-[10px] text-slate-400 leading-tight pt-0.5">
+                Berkeley Earth reference (20 µg PM₂.₅ ≈ 1 cig). WHO 25 µg is an illustrative daily reference benchmark derived from ambient guidelines.
+              </p>
             </div>
           </div>
 
           {/* Instant Rate Telemetry Footer */}
-          <div className="pt-3.5 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-mono">
-            <span className="text-slate-500 flex items-center gap-1.5">
+          <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-mono">
+            <span className="text-slate-500 flex items-center gap-1.5 font-sans">
               <span className={`w-2 h-2 rounded-full ${isTracking ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
               Inhalation Velocity
             </span>
-            <span className="text-emerald-600 font-extrabold text-sm">
+            <span className="text-slate-900 font-extrabold text-xs">
               {`${activeRate.toFixed(5)} μg/s`}
             </span>
           </div>
@@ -411,16 +403,16 @@ export default function TodayExposureHero({
             <button
               type="button"
               onClick={() => onOpenAiAdvisor?.("explain")}
-              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+              className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <Sparkles className="w-3.5 h-3.5 text-blue-300" />
               <span>Explain My Exposure with Bedrock AI</span>
             </button>
           </div>
         </div>
 
         {/* Card 2: Micro-Environment Breakdown & Clean Air Shield */}
-        <div className="lg:col-span-4 bg-white rounded-[28px] p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between">
+        <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -470,13 +462,15 @@ export default function TodayExposureHero({
               <span>Clean Air Shield:</span>
             </span>
             <span className="font-extrabold text-emerald-600 font-mono text-xs bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
-              +{shieldSavedUg > 0 ? shieldSavedUg : ((liveDisplayExposure * 0.45).toFixed(1))} μg saved
+              {exposureData === null
+                ? "Calculating..."
+                : `+${Number(shieldSavedUg || 0).toFixed(1)} μg saved`}
             </span>
           </div>
         </div>
 
         {/* Card 3: Live Kinetic Variables & Geofence Radar */}
-        <div className="lg:col-span-4 bg-white rounded-[28px] p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between space-y-3">
+        <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between space-y-3">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -583,47 +577,63 @@ export default function TodayExposureHero({
 
             {/* Geofence Proximity List */}
             <div className="space-y-1.5">
-              {placesWithDist.slice(0, 2).map((place) => {
-                const PlaceIcon = getPlaceIcon(place.location_type);
-                const isInside = place.distanceMeters <= (place.radius_meters || 100);
-
-                return (
-                  <div
-                    key={place.id}
-                    className={`px-2.5 py-1.5 rounded-xl border transition-all flex items-center justify-between ${isInside
-                      ? "bg-blue-50/70 border-blue-200/80 shadow-xs"
-                      : "bg-slate-50/70 border-slate-100"
-                      }`}
+              {placesWithDist.length === 0 ? (
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                  <p className="text-xs text-slate-500 font-medium">No saved places yet</p>
+                  <Link
+                    href="/dashboard/locations"
+                    className="text-[11px] font-bold text-[#0062ff] hover:underline mt-1 inline-block"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${getPlaceBadgeColor(
-                          place.location_type
-                        )}`}
-                      >
-                        <PlaceIcon className="w-3 h-3" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate leading-none">{place.name}</p>
-                        <p className="text-[9px] text-slate-400 capitalize font-medium mt-0.5">
-                          {place.location_type} • {((1 - (place.indoor_coefficient ?? 0.5)) * 100).toFixed(0)}% shielded
-                        </p>
-                      </div>
-                    </div>
+                    + Add Home or Office
+                  </Link>
+                </div>
+              ) : (
+                placesWithDist.slice(0, 2).map((place) => {
+                  const PlaceIcon = getPlaceIcon(place.location_type);
+                  const isInside = place.distanceMeters !== null && place.distanceMeters <= (place.radius_meters || 100);
 
-                    <div className="text-right shrink-0">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[9px] font-bold font-mono ${isInside
-                          ? "bg-[#0062ff] text-white shadow-xs"
-                          : "bg-white text-slate-600 border border-slate-200"
-                          }`}
-                      >
-                        {isInside ? `Inside (${formatDistance(place.distanceMeters)})` : `${formatDistance(place.distanceMeters)}`}
-                      </span>
+                  return (
+                    <div
+                      key={place.id}
+                      className={`px-2.5 py-1.5 rounded-xl border transition-all flex items-center justify-between ${isInside
+                        ? "bg-blue-50/70 border-blue-200/80 shadow-xs"
+                        : "bg-slate-50/70 border-slate-100"
+                        }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${getPlaceBadgeColor(
+                            place.location_type
+                          )}`}
+                        >
+                          <PlaceIcon className="w-3 h-3" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate leading-none">{place.name}</p>
+                          <p className="text-[9px] text-slate-400 capitalize font-medium mt-0.5">
+                            {place.location_type} • {((1 - (place.indoor_coefficient ?? 0.5)) * 100).toFixed(0)}% shielded
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[9px] font-bold font-mono ${isInside
+                            ? "bg-[#0062ff] text-white shadow-xs"
+                            : "bg-white text-slate-600 border border-slate-200"
+                            }`}
+                        >
+                          {place.distanceMeters !== null
+                            ? isInside
+                              ? `Inside (${formatDistance(place.distanceMeters)})`
+                              : formatDistance(place.distanceMeters)
+                            : "Awaiting GPS"}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
 

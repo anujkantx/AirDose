@@ -44,9 +44,12 @@ export default function DashboardNavbar({ user, onLogout, onOpenSidebar, onOpenA
     }
 
     if (savedLocs.length === 0) {
-      savedLocs = [
-        { id: 1, user_id: 1, location_type: "home", name: "Home", latitude: 28.6139, longitude: 77.2090, radius_meters: 50, indoor_coefficient: 0.5 },
-      ];
+      setLocationStatus({
+        isMatched: false,
+        locationType: "outdoor",
+        displayText: "Outdoor (No saved places)",
+      });
+      return;
     }
 
     let matchedPlace: UserLocation | null = null;
@@ -102,12 +105,22 @@ export default function DashboardNavbar({ user, onLogout, onOpenSidebar, onOpenA
           checkProximityToLocations(lat, lng).finally(() => setLocating(false));
         },
         () => {
-          checkProximityToLocations(28.6139, 77.2090).finally(() => setLocating(false));
+          setLocationStatus({
+            isMatched: false,
+            locationType: "unknown",
+            displayText: "Location unavailable",
+          });
+          setLocating(false);
         },
         { timeout: 8000, enableHighAccuracy: true }
       );
     } else {
-      checkProximityToLocations(28.6139, 77.2090).finally(() => setLocating(false));
+      setLocationStatus({
+        isMatched: false,
+        locationType: "unknown",
+        displayText: "Location unsupported",
+      });
+      setLocating(false);
     }
   };
 
@@ -137,8 +150,10 @@ export default function DashboardNavbar({ user, onLogout, onOpenSidebar, onOpenA
         {/* Left: Mobile Menu & Proximity Pill */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
+            type="button"
             onClick={onOpenSidebar}
-            className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-600 hover:text-slate-900 lg:hidden"
+            aria-label="Open navigation sidebar"
+            className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-600 hover:text-slate-900 lg:hidden cursor-pointer"
             title="Open Navigation"
           >
             <Menu className="w-4 h-4" />
@@ -152,9 +167,11 @@ export default function DashboardNavbar({ user, onLogout, onOpenSidebar, onOpenA
                 {locationStatus.displayText}
               </span>
               <button
+                type="button"
                 onClick={detectCurrentLocation}
                 disabled={locating}
-                className="p-0.5 text-slate-400 hover:text-blue-600 rounded-full transition-all ml-1"
+                aria-label="Refresh proximity location"
+                className="p-0.5 text-slate-400 hover:text-blue-600 rounded-full transition-all ml-1 cursor-pointer"
                 title="Refresh Proximity"
               >
                 <RefreshCw className={`w-3 h-3 ${locating ? "animate-spin text-blue-600" : ""}`} />
@@ -168,19 +185,22 @@ export default function DashboardNavbar({ user, onLogout, onOpenSidebar, onOpenA
           {/* Ask AirDose AI Button */}
           {onOpenAiAdvisor && (
             <button
+              type="button"
               onClick={onOpenAiAdvisor}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold text-white bg-[#0062ff] hover:bg-blue-600 shadow-xs transition-colors cursor-pointer"
               title="Open Amazon Bedrock AI Exposure Advisor"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-              <span className="hidden sm:inline">Ask AirDose AI</span>
+              <Sparkles className="w-3.5 h-3.5 text-blue-200" />
+              <span className="hidden sm:inline">Ask Bedrock AI</span>
               <span className="sm:hidden">AI</span>
             </button>
           )}
 
           {/* Notifications */}
           <button
-            className="w-9 h-9 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors"
+            type="button"
+            aria-label="View notifications"
+            className="w-9 h-9 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
@@ -195,8 +215,10 @@ export default function DashboardNavbar({ user, onLogout, onOpenSidebar, onOpenA
               {user?.name?.split(" ")[0] || "User"}
             </span>
             <button
+              type="button"
               onClick={onLogout}
-              className="p-1 text-slate-400 hover:text-rose-600 rounded-full transition-colors ml-1"
+              aria-label="Sign out"
+              className="p-1 text-slate-400 hover:text-rose-600 rounded-full transition-colors ml-1 cursor-pointer"
               title="Sign Out"
             >
               <LogOut className="w-3.5 h-3.5" />

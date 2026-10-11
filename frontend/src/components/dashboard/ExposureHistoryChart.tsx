@@ -53,6 +53,8 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
   const [loading, setLoading] = useState<boolean>(true);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [chartWidth, setChartWidth] = useState<number>(650);
 
   const loadHistory = async (selectedPeriod: "week" | "month" = "week") => {
     try {
@@ -69,6 +71,20 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
   useEffect(() => {
     loadHistory(period);
   }, [todayExposureUg, period]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const updateWidth = () => {
+      if (containerRef.current) {
+        const w = containerRef.current.clientWidth;
+        if (w > 0) setChartWidth(w);
+      }
+    };
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -88,14 +104,14 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
   const avgCigs = (Number(avgVal) / 20.0).toFixed(2);
   const peakVal = data.length > 0 ? Math.max(...data.map((d) => d.exposure_ug)).toFixed(1) : "0.0";
 
-  // SVG coordinate geometry
-  const svgWidth = 500;
+  // SVG coordinate geometry - dynamically scales to full container width
+  const svgWidth = chartWidth;
   const svgHeight = 150;
-  const padLeft = 32;
-  const padRight = 16;
+  const padLeft = 28;
+  const padRight = 14;
   const padTop = 18;
   const padBottom = 26;
-  const graphW = svgWidth - padLeft - padRight;
+  const graphW = Math.max(10, svgWidth - padLeft - padRight);
   const graphH = svgHeight - padTop - padBottom;
   const baselineY = padTop + graphH;
 
@@ -148,7 +164,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
   const activeCoord = activeIndex !== null ? points[activeIndex] : null;
 
   return (
-    <div className="bg-white rounded-[28px] p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between min-w-0 overflow-hidden">
+    <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-soft flex flex-col justify-between min-w-0 overflow-hidden">
       <div>
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
@@ -159,7 +175,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                 Inhalation Dose Graph
               </h3>
               <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 shrink-0">
-                Functional Spline
+                Continuous Trend
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5 truncate">
@@ -171,18 +187,22 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
             {/* View Mode Toggle */}
             <div className="hidden sm:flex items-center bg-slate-100 border border-slate-200 p-0.5 rounded-full text-xs">
               <button
+                type="button"
                 onClick={() => setChartType("curve")}
                 title="Continuous Curve"
-                className={`p-1 rounded-full transition-all ${
+                aria-label="Continuous Curve View"
+                className={`p-1 rounded-full transition-all cursor-pointer ${
                   chartType === "curve" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
                 <LineChart className="w-3.5 h-3.5" />
               </button>
               <button
+                type="button"
                 onClick={() => setChartType("bars")}
                 title="Discrete Histogram"
-                className={`p-1 rounded-full transition-all ${
+                aria-label="Discrete Histogram View"
+                className={`p-1 rounded-full transition-all cursor-pointer ${
                   chartType === "bars" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
                 }`}
               >
@@ -193,8 +213,10 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
             {/* Timeframe Toggle */}
             <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 p-0.5 rounded-full text-xs font-bold">
               <button
+                type="button"
                 onClick={() => setPeriod("week")}
-                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-all ${
+                aria-label="View 7 Days Period"
+                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-all cursor-pointer ${
                   period === "week"
                     ? "bg-white text-slate-900 shadow-xs"
                     : "text-slate-500 hover:text-slate-900"
@@ -203,8 +225,10 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                 7 Days
               </button>
               <button
+                type="button"
                 onClick={() => setPeriod("month")}
-                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-all ${
+                aria-label="View 30 Days Period"
+                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition-all cursor-pointer ${
                   period === "month"
                     ? "bg-white text-slate-900 shadow-xs"
                     : "text-slate-500 hover:text-slate-900"
@@ -217,7 +241,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
         </div>
 
         {/* Dynamic Functional Graph Container */}
-        <div className="relative mt-2 w-full select-none">
+        <div ref={containerRef} className="relative mt-2 w-full select-none">
           {loading ? (
             <div className="h-40 w-full flex items-center justify-center text-xs text-slate-400">
               <div className="flex items-center gap-2">
@@ -231,6 +255,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                 <svg
                   ref={svgRef}
                   viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+                  preserveAspectRatio="none"
                   className="w-full h-full cursor-crosshair overflow-visible"
                   onMouseMove={(e) => handlePointerMove(e.clientX)}
                   onMouseLeave={() => setActiveIndex(null)}
@@ -297,7 +322,7 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                     textAnchor="end"
                     className="text-[9px] fill-amber-600 font-mono font-bold"
                   >
-                    WHO 25µg Cap
+                    WHO Guideline Ref (25µg)
                   </text>
                   <text
                     x={padLeft - 6}
@@ -394,7 +419,8 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                 <div
                   className={`h-full flex items-end justify-between ${
                     period === "month" ? "gap-[2px]" : "gap-2 sm:gap-2.5"
-                  } px-1 w-full`}
+                  } w-full`}
+                  style={{ paddingLeft: `${padLeft}px`, paddingRight: `${padRight}px` }}
                 >
                   {data.map((point, idx) => {
                     const heightPct = Math.min(100, Math.max(8, (point.exposure_ug / maxVal) * 100));
@@ -450,11 +476,11 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
                     <div className="mt-0.5 text-[8px] uppercase font-bold tracking-wider">
                       {activePoint.exposure_ug > 25 ? (
                         <span className="text-amber-400 flex items-center justify-center gap-1">
-                          <AlertCircle className="w-2.5 h-2.5" /> Exceeds WHO Cap
+                          <AlertCircle className="w-2.5 h-2.5" /> Above Guideline Ref
                         </span>
                       ) : (
                         <span className="text-emerald-400 flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-2.5 h-2.5" /> Safe Threshold
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Within Guideline Ref
                         </span>
                       )}
                     </div>
@@ -465,9 +491,12 @@ export default function ExposureHistoryChart({ todayExposureUg }: ExposureHistor
           )}
 
           {/* X-Axis Milestone Date Labels */}
-          <div className="mt-1 pt-1.5 border-t border-slate-100 w-full min-w-0">
+          <div
+            className="mt-1 pt-1.5 border-t border-slate-100 w-full min-w-0"
+            style={{ paddingLeft: `${padLeft}px`, paddingRight: `${padRight}px` }}
+          >
             {period === "week" ? (
-              <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold px-2">
+              <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
                 {data.map((point, idx) => {
                   const isToday = point.isToday;
                   const isActive = activeIndex === idx;
