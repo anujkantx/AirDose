@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Radio,
   BookOpen,
+  Compass,
 } from "lucide-react";
 import { User } from "@/lib/api";
 
@@ -27,6 +28,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
 
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+    { label: "Simulate Route", icon: Compass, href: "/dashboard/simulate" },
     { label: "Saved Places", icon: MapPin, href: "/dashboard/locations" },
     { label: "Formula & Details", icon: BookOpen, href: "/dashboard/details" },
   ];
@@ -43,7 +45,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-slate-200/80 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-slate-200/90 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -78,7 +80,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
                 onClick={onClose}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all ${
                   isActive
-                    ? "bg-[#0062ff] text-white shadow-md shadow-blue-500/20"
+                    ? "bg-[#0062ff] text-white shadow-md shadow-blue-500/25"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                 }`}
               >
@@ -93,10 +95,10 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
         </nav>
 
         {/* Telemetry Status Box */}
-        <div className="p-3.5 mx-4 mb-4 rounded-2xl bg-[#f0f3f8] border border-slate-200/80 text-xs">
+        <div className="p-3.5 mx-4 mb-4 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider">Engine Status</span>
-            <span className="text-emerald-600 text-[10px] font-bold flex items-center gap-1">
+            <span className="text-emerald-600 text-[10px] font-bold flex items-center gap-1 font-mono">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> LIVE
             </span>
           </div>
@@ -106,7 +108,7 @@ export default function Sidebar({ user, onLogout, isOpen, onClose }: SidebarProp
         </div>
 
         {/* User Card & Logout */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+        <div className="p-4 border-t border-slate-100 bg-slate-50/70">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-400 to-rose-400 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm">

@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db import init_db
-from app.routers import auth, locations, air_quality, exposure
+from app.routers import auth, locations, air_quality, exposure, ai
 
 
 @asynccontextmanager
@@ -39,6 +39,7 @@ app.include_router(auth.router)
 app.include_router(locations.router)
 app.include_router(air_quality.router)
 app.include_router(exposure.router)
+app.include_router(ai.router)
 
 
 @app.get("/api/health", tags=["Health"])

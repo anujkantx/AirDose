@@ -26,11 +26,11 @@ export default function ExposureFormulaModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-[32px] max-w-xl w-full shadow-2xl border border-slate-100 overflow-hidden relative animate-in zoom-in-95 duration-200">
         <div className="p-6 pb-4 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#0062ff] flex items-center justify-center shadow-sm">
+            <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#0062ff] flex items-center justify-center shadow-xs">
               <Zap className="w-4 h-4" />
             </div>
             <div>
@@ -44,7 +44,7 @@ export default function ExposureFormulaModal({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -98,6 +98,7 @@ export default function ExposureFormulaModal({
                   0.0001 m³/s
                 </span>
               </div>
+
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
                 <span>Hourly Inhaled Mass:</span>
                 <span className="font-bold text-slate-900">
@@ -136,7 +137,7 @@ export default function ExposureFormulaModal({
 
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm"
+            className="px-5 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
           >
             Close
           </button>

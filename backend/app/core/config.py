@@ -29,6 +29,13 @@ class Settings:
     # External APIs
     OPENAQ_API_KEY: str = os.getenv("OPENAQ_API_KEY", "").strip()
 
+    # AWS & Amazon Bedrock Configuration
+    AWS_REGION: str = os.getenv("AWS_REGION", "ap-south-1").strip()
+    BEDROCK_MODEL_ID: str = os.getenv("BEDROCK_MODEL_ID", "amazon.nova-micro-v1:0").strip()
+    BEDROCK_MAX_TOKENS: int = int(os.getenv("BEDROCK_MAX_TOKENS", "500"))
+    BEDROCK_TEMPERATURE: float = float(os.getenv("BEDROCK_TEMPERATURE", "0.3"))
+    BEDROCK_TIMEOUT_SECONDS: int = int(os.getenv("BEDROCK_TIMEOUT_SECONDS", "15"))
+
     # Database Configuration
     DB_PATH: str = os.getenv(
         "DB_PATH",

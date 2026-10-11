@@ -10,6 +10,7 @@ import {
   GraduationCap,
   MapPin,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { User, fetchUserLocations, UserLocation } from "@/lib/api";
 import { calculateHaversineDistance, formatDistance } from "@/lib/haversine";
@@ -18,9 +19,10 @@ interface DashboardNavbarProps {
   user: User | null;
   onLogout: () => void;
   onOpenSidebar: () => void;
+  onOpenAiAdvisor?: () => void;
 }
 
-export default function DashboardNavbar({ user, onLogout, onOpenSidebar }: DashboardNavbarProps) {
+export default function DashboardNavbar({ user, onLogout, onOpenSidebar, onOpenAiAdvisor }: DashboardNavbarProps) {
   const [locating, setLocating] = useState<boolean>(false);
   const [locationStatus, setLocationStatus] = useState<{
     isMatched: boolean;
@@ -130,13 +132,13 @@ export default function DashboardNavbar({ user, onLogout, onOpenSidebar }: Dashb
   };
 
   return (
-    <header className="sticky top-0 z-30 px-4 sm:px-8 pt-4 pb-2 bg-[#f0f3f8]/95 backdrop-blur-md">
+    <header className="sticky top-0 z-30 px-4 sm:px-8 pt-4 pb-2 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
       <div className="w-full flex items-center justify-between gap-3">
         {/* Left: Mobile Menu & Proximity Pill */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={onOpenSidebar}
-            className="p-2 rounded-full bg-white border border-slate-200 shadow-sm text-slate-600 hover:text-slate-900 lg:hidden"
+            className="p-2 rounded-full bg-white border border-slate-200 shadow-xs text-slate-600 hover:text-slate-900 lg:hidden"
             title="Open Navigation"
           >
             <Menu className="w-4 h-4" />
@@ -144,7 +146,7 @@ export default function DashboardNavbar({ user, onLogout, onOpenSidebar }: Dashb
 
           {/* Proximity Pill & Location Badge */}
           <div className="flex items-center gap-1.5">
-            <div className="inline-flex items-center gap-1.5 bg-white px-3.5 py-2 rounded-full text-xs font-medium text-slate-700 border border-slate-200/70 shadow-sm">
+            <div className="inline-flex items-center gap-1.5 bg-white px-3.5 py-2 rounded-full text-xs font-medium text-slate-700 border border-slate-200/90 shadow-xs">
               {getLocationIcon()}
               <span className="truncate max-w-[160px] sm:max-w-[260px] font-semibold text-slate-800">
                 {locationStatus.displayText}
@@ -161,18 +163,31 @@ export default function DashboardNavbar({ user, onLogout, onOpenSidebar }: Dashb
           </div>
         </div>
 
-        {/* Right: Notification & Profile */}
+        {/* Right: AI Advisor, Notification & Profile */}
         <div className="flex items-center gap-2">
+          {/* Ask AirDose AI Button */}
+          {onOpenAiAdvisor && (
+            <button
+              onClick={onOpenAiAdvisor}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+              title="Open Amazon Bedrock AI Exposure Advisor"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+              <span className="hidden sm:inline">Ask AirDose AI</span>
+              <span className="sm:hidden">AI</span>
+            </button>
+          )}
+
           {/* Notifications */}
           <button
-            className="w-9 h-9 rounded-full bg-white border border-slate-200/80 shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors"
+            className="w-9 h-9 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors"
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
           </button>
 
           {/* User Avatar Circle & Signout */}
-          <div className="flex items-center gap-1.5 bg-white p-1 pr-2.5 rounded-full border border-slate-200/80 shadow-sm">
+          <div className="flex items-center gap-1.5 bg-white p-1 pr-2.5 rounded-full border border-slate-200 shadow-xs">
             <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-400 to-rose-400 flex items-center justify-center text-white text-xs font-bold">
               {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
             </div>

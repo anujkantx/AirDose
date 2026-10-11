@@ -37,8 +37,8 @@ const POLLUTANTS_CONFIG: PollutantConfig[] = [
     description: "Alveolar particles ≤2.5µm",
     safeLimit: 15.0,
     icon: CloudFog,
-    color: "text-amber-600",
-    bgColor: "bg-amber-50",
+    color: "text-amber-400",
+    bgColor: "bg-amber-500/15",
   },
   {
     key: "pm10",
@@ -47,8 +47,8 @@ const POLLUTANTS_CONFIG: PollutantConfig[] = [
     description: "Inhalable dust ≤10µm",
     safeLimit: 45.0,
     icon: Layers,
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
+    color: "text-orange-400",
+    bgColor: "bg-orange-500/15",
   },
   {
     key: "no2",
@@ -57,8 +57,8 @@ const POLLUTANTS_CONFIG: PollutantConfig[] = [
     description: "Combustion gas",
     safeLimit: 25.0,
     icon: Flame,
-    color: "text-rose-600",
-    bgColor: "bg-rose-50",
+    color: "text-rose-400",
+    bgColor: "bg-rose-500/15",
   },
   {
     key: "o3",
@@ -67,8 +67,8 @@ const POLLUTANTS_CONFIG: PollutantConfig[] = [
     description: "Photochemical oxidant",
     safeLimit: 60.0,
     icon: Zap,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
+    color: "text-purple-400",
+    bgColor: "bg-purple-500/15",
   },
   {
     key: "co",
@@ -77,8 +77,8 @@ const POLLUTANTS_CONFIG: PollutantConfig[] = [
     description: "Vehicle emissions",
     safeLimit: 4.0,
     icon: Activity,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
+    color: "text-blue-400",
+    bgColor: "bg-blue-500/15",
   },
   {
     key: "so2",
@@ -87,8 +87,8 @@ const POLLUTANTS_CONFIG: PollutantConfig[] = [
     description: "Power plant gas",
     safeLimit: 20.0,
     icon: Droplets,
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50",
+    color: "text-emerald-400",
+    bgColor: "bg-emerald-500/15",
   },
 ];
 
@@ -97,7 +97,7 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 animate-pulse">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-36 bg-white rounded-[24px] border border-slate-100" />
+          <div key={i} className="h-36 bg-white rounded-[24px] border border-slate-200" />
         ))}
       </div>
     );
@@ -108,11 +108,11 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
   const getLimitTheme = (percent: number | null) => {
     if (percent === null) {
       return {
-        stroke: "stroke-slate-300",
+        stroke: "stroke-slate-200",
         text: "text-slate-400",
         bg: "bg-slate-50",
-        border: "border-slate-100",
-        badge: "bg-slate-100 text-slate-500",
+        border: "border-slate-200",
+        badge: "bg-slate-50 text-slate-500 border-slate-200",
         label: "N/A",
       };
     }
@@ -120,19 +120,19 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
       return {
         stroke: "stroke-emerald-500",
         text: "text-emerald-600",
-        bg: "bg-emerald-50/70",
-        border: "border-emerald-100",
-        badge: "bg-emerald-50 text-emerald-600 border-emerald-100",
+        bg: "bg-emerald-50",
+        border: "border-emerald-200",
+        badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
         label: "Safe",
       };
     }
     if (percent <= 100) {
       return {
-        stroke: "stroke-[#0062ff]",
-        text: "text-[#0062ff]",
-        bg: "bg-blue-50/70",
-        border: "border-blue-100",
-        badge: "bg-blue-50 text-[#0062ff] border-blue-100",
+        stroke: "stroke-blue-500",
+        text: "text-blue-600",
+        bg: "bg-blue-50",
+        border: "border-blue-200",
+        badge: "bg-blue-50 text-blue-700 border-blue-200",
         label: "Normal",
       };
     }
@@ -140,18 +140,18 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
       return {
         stroke: "stroke-amber-500",
         text: "text-amber-600",
-        bg: "bg-amber-50/70",
-        border: "border-amber-100",
-        badge: "bg-amber-50 text-amber-600 border-amber-100",
+        bg: "bg-amber-50",
+        border: "border-amber-200",
+        badge: "bg-amber-50 text-amber-700 border-amber-200",
         label: "Elevated",
       };
     }
     return {
       stroke: "stroke-rose-500",
       text: "text-rose-600",
-      bg: "bg-rose-50/70",
-      border: "border-rose-100",
-      badge: "bg-rose-50 text-rose-600 border-rose-100",
+      bg: "bg-rose-50",
+      border: "border-rose-200",
+      badge: "bg-rose-50 text-rose-700 border-rose-200",
       label: "Exceeded",
     };
   };
@@ -163,21 +163,21 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
           <h3 className="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             Pollutant Telemetry Matrix
           </h3>
-          <span className="text-xs text-slate-400 font-medium">
+          <span className="text-xs text-slate-500 font-medium">
             Live OpenAQ Sensors &amp; Safe Limit Utilization
           </span>
         </div>
 
         {/* Time-Bound Spatio-Temporal Cache Info Badge */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono font-semibold text-slate-600 bg-slate-100/90 border border-slate-200/80 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
+          <span className="text-[11px] font-mono font-semibold text-slate-700 bg-white border border-slate-200/80 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-soft">
             <span className={`w-1.5 h-1.5 rounded-full ${data.is_cached ? "bg-blue-500" : "bg-emerald-500 animate-pulse"}`} />
             <span>
               {data.is_cached
                 ? `Cached (${data.cache_distance_meters ? `${data.cache_distance_meters}m` : "<1km"} • ${data.cached_at_display || "Recent"})`
                 : `Live Fetch (${data.fetched_at_display || "Just now"})`}
             </span>
-            <span className="text-slate-400">|</span>
+            <span className="text-slate-300">|</span>
             <span className="text-slate-500">
               TTL: {Math.max(1, Math.round((data.cache_expires_in_seconds ?? 1800) / 60))}m
             </span>
@@ -210,11 +210,11 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
           return (
             <div
               key={item.key}
-              className="p-4 rounded-[24px] bg-white border border-slate-100 shadow-soft hover:shadow-md transition-all flex flex-col justify-between relative group"
+              className="p-4 rounded-[24px] bg-white border border-slate-200/80 shadow-soft hover:border-slate-300 transition-all flex flex-col justify-between relative group"
             >
               {/* Header: Icon & Circular Progress Percentage Ring */}
               <div className="flex items-center justify-between">
-                <div className={`w-8 h-8 rounded-xl ${item.bgColor} ${item.color} flex items-center justify-center`}>
+                <div className={`w-8 h-8 rounded-xl ${item.bgColor} ${item.color} border border-slate-100 flex items-center justify-center`}>
                   <Icon className="w-4 h-4" />
                 </div>
 
@@ -263,8 +263,8 @@ export default function PollutantGrid({ data, loading }: PollutantGridProps) {
                     {unit}
                   </span>
                 </div>
-                <div className="text-[11px] font-bold text-slate-600 mt-0.5">
-                  {item.chemical} • <span className="text-slate-400 font-normal">{item.name}</span>
+                <div className="text-[11px] font-bold text-slate-800 mt-0.5">
+                  {item.chemical} • <span className="text-slate-500 font-normal">{item.name}</span>
                 </div>
               </div>
 

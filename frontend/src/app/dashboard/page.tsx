@@ -7,6 +7,7 @@ import DashboardNavbar from "@/components/layout/DashboardNavbar";
 import TodayExposureHero from "@/components/dashboard/TodayExposureHero";
 import ExposureContributionCard from "@/components/dashboard/ExposureContributionCard";
 import ExposureHistoryChart from "@/components/dashboard/ExposureHistoryChart";
+import { AiAdvisorModal, BreatheImpactVisualizer } from "@/components/dashboard";
 import AirQualityHero from "@/components/air-quality/AirQualityHero";
 import PollutantGrid from "@/components/air-quality/PollutantGrid";
 import StationInfoCard from "@/components/air-quality/StationInfoCard";
@@ -20,6 +21,7 @@ import {
   User,
   AirQualityData,
 } from "@/lib/api";
+import type { ExposureContext } from "@/types";
 import { RefreshCw } from "lucide-react";
 
 export default function DashboardPage() {
@@ -29,6 +31,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [aiAdvisorOpen, setAiAdvisorOpen] = useState<boolean>(false);
+  const [aiAdvisorMode, setAiAdvisorMode] = useState<"chat" | "explain">("chat");
 
   const loadAirQuality = useCallback(async (lat: number, lon: number, forceRefresh: boolean = false) => {
     try {
@@ -83,18 +87,50 @@ export default function DashboardPage() {
 
   if (loading && !airData) {
     return (
-      <div className="min-h-screen bg-[#f0f3f8] flex flex-col items-center justify-center text-slate-500 font-sans">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center text-slate-600 font-sans">
         <div className="w-10 h-10 rounded-2xl bg-[#0062ff] text-white flex items-center justify-center font-bold text-base mb-4 shadow-lg shadow-blue-500/20 animate-pulse">
           AD
         </div>
-        <p className="text-sm font-bold text-slate-800">Initializing Health &amp; Inhalation Engine...</p>
+        <p className="text-sm font-bold text-slate-900">Initializing Health &amp; Inhalation Engine...</p>
         <p className="text-xs text-slate-400 mt-1">Connecting to OpenAQ particulate telemetry matrix</p>
       </div>
     );
   }
 
+  const aiExposureContext: ExposureContext = {
+    location: airData?.station?.name || "Current Location",
+    latitude: userCoords.lat,
+    longitude: userCoords.lon,
+    pollutant: "pm25",
+    concentration: airData?.pollutants?.pm25?.value ?? (exposureData?.current?.pm25 ?? 75.0),
+    unit: "µg/m³",
+    aqi: airData?.aqi ?? 85,
+    activity: isAutoMode
+      ? autoDetectedLabel
+      : breathingFactor >= 3.0
+      ? "Running"
+      : breathingFactor >= 1.5
+      ? "Walking"
+      : "Rest",
+    duration_minutes: 30.0,
+    breathing_factor: breathingFactor,
+    infiltration_factor: exposureData?.current?.infiltration_factor ?? 1.0,
+    total_exposure_ug: exposureData?.total_exposure_ug ?? 0.0,
+    inhalation_rate_ug_s: exposureData?.current?.inhalation_rate_ug_s,
+    cigarettes_equivalent: exposureData?.cigarettes_equivalent,
+    who_percentage: exposureData?.who_percentage,
+    who_status: exposureData?.who_status,
+    clean_air_shield_saved_ug: exposureData?.clean_air_shield_saved_ug,
+    data_source: airData?.is_cached
+      ? "cached"
+      : airData?.status === "LIVE"
+      ? "live"
+      : "demo",
+    observed_at: airData?.fetched_at,
+  };
+
   return (
-    <div className="min-h-screen bg-[#f0f3f8] text-slate-900 flex font-sans">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex font-sans">
       {/* 1. Sidebar */}
       <Sidebar
         user={user}
@@ -110,6 +146,10 @@ export default function DashboardPage() {
           user={user}
           onLogout={handleLogout}
           onOpenSidebar={() => setSidebarOpen(true)}
+          onOpenAiAdvisor={() => {
+            setAiAdvisorMode("chat");
+            setAiAdvisorOpen(true);
+          }}
         />
 
         {/* 3. Main Dashboard Body */}
@@ -117,11 +157,11 @@ export default function DashboardPage() {
           {/* Dashboard Header Status Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
             <div className="flex items-center gap-2.5">
-              <span className="text-xs font-semibold text-[#0062ff] bg-white px-3 py-1.5 rounded-full border border-slate-100 shadow-soft flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-700 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-xs flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 Live Sensor Telemetry
               </span>
-              <span className="text-xs text-slate-400 font-medium hidden md:inline">
+              <span className="text-xs text-slate-500 font-medium hidden md:inline">
                 GPS: {userCoords.lat.toFixed(4)}°N, {userCoords.lon.toFixed(4)}°E
               </span>
             </div>
@@ -133,9 +173,9 @@ export default function DashboardPage() {
                   loadExposureSummary();
                 }}
                 disabled={refreshing}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-full transition-all shadow-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-full transition-all shadow-xs"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#0062ff]" : ""}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-blue-600" : ""}`} />
                 <span>{refreshing ? "Syncing..." : "Refresh Matrix"}</span>
               </button>
             </div>
@@ -155,6 +195,26 @@ export default function DashboardPage() {
             onAutoModeChange={handleAutoModeChange}
             autoDetectedLabel={autoDetectedLabel}
             permissionDenied={permissionDenied}
+            onOpenAiAdvisor={(mode = "chat") => {
+              setAiAdvisorMode(mode);
+              setAiAdvisorOpen(true);
+            }}
+          />
+
+          {/* 1.5 BREATHE IMPACT — Interactive Pulmonary Dosimetry Visualizer */}
+          <BreatheImpactVisualizer
+            pm25={airData?.pollutants?.pm25?.value ?? (exposureData?.current?.pm25 ?? 75.0)}
+            aqi={airData?.aqi}
+            breathingFactor={breathingFactor}
+            activityLabel={isAutoMode ? autoDetectedLabel : breathingFactor >= 3.0 ? "Running" : breathingFactor >= 1.5 ? "Walking" : "Rest"}
+            locationName={airData?.station?.name || "Current Location"}
+            dataSource={airData?.is_cached ? "cached" : airData?.status === "LIVE" ? "live" : "demo"}
+            totalAccumulatedUg={exposureData?.total_exposure_ug}
+            isTracking={isTracking}
+            onOpenAiAdvisor={(mode = "chat") => {
+              setAiAdvisorMode(mode);
+              setAiAdvisorOpen(true);
+            }}
           />
 
           {/* 2. Exposure Insights: Micro-Environment Breakdown, Historical Inhalation Log & Health Advisory */}
@@ -192,10 +252,18 @@ export default function DashboardPage() {
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-slate-200/60 py-5 text-center text-xs text-slate-400 font-medium">
+        <footer className="border-t border-slate-200 py-5 text-center text-xs text-slate-500 font-medium">
           AirDose — Personal PM2.5 Inhalation Monitor • Mathematical Inhalation Model v1.0
         </footer>
       </div>
+
+      {/* Amazon Bedrock AI Exposure Advisor Modal */}
+      <AiAdvisorModal
+        isOpen={aiAdvisorOpen}
+        onClose={() => setAiAdvisorOpen(false)}
+        context={aiExposureContext}
+        initialMode={aiAdvisorMode}
+      />
     </div>
   );
 }

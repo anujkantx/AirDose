@@ -28,6 +28,14 @@ from app.schemas.air_quality import (
     DataQualityInfo,
     AirQualityResponse,
 )
+from app.schemas.ai import (
+    ExposureContext,
+    ChatMessage,
+    AdvisorRequest,
+    AdvisorResponse,
+    ExplainExposureRequest,
+    ExplainExposureResponse,
+)
 
 __all__ = [
     "SignUpRequest",
@@ -50,4 +58,10 @@ __all__ = [
     "StationInfo",
     "DataQualityInfo",
     "AirQualityResponse",
+    "ExposureContext",
+    "ChatMessage",
+    "AdvisorRequest",
+    "AdvisorResponse",
+    "ExplainExposureRequest",
+    "ExplainExposureResponse",
 ]
